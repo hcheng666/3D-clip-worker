@@ -1,255 +1,278 @@
 # 3D Tiles Clip Worker
 
-Standalone C++17 worker for strict spatial clipping of 3D Tiles mesh content.
+`3D Tiles Clip Worker` 是一个独立的 C++17 常驻任务进程，用于按照授权空间范围严格裁切
+3D Tiles Mesh 内容。Worker 从元数据控制面领取任务，通过短期预签名 URL 下载源 B3DM、执行
+几何与纹理裁切、上传结果，并向控制面报告 `READY`、`EMPTY` 或失败状态。
 
-The worker is fail closed: unsupported or invalid content is reported to the control plane and is
-never passed through as an authorized clipped asset. Production targets are Linux `amd64` and
-Linux `arm64`; Windows is supported as a development build environment only. ARMv7 and other
-32-bit ARM targets are not supported.
+项目采用 **fail closed** 原则：格式不受支持、输入无效、校验失败或处理异常时，不会把原始 Tile
+作为已授权结果透传。生产目标平台为 Linux `amd64` 和 Linux `arm64`；Windows 仅作为开发构建
+环境。不支持 ARMv7 和其他 32 位 ARM 平台。
 
-## Current scope
+当前程序版本为 `0.1.3`，默认裁切算法版本为 `v4`。
 
-- Strict B3DM v1 and embedded GLB 2.0 parsing, with bounded four-byte-alignment
-  compatibility for deterministic legacy input.
-- Bounded normalization of known numeric non-standard sampler `wrapR`; two-dimensional
-  `wrapS`/`wrapT` masking rules remain strict.
-- EPSG:4490 Polygon/MultiPolygon/Hole projection into a local metric frame.
-- Triangle/prism clipping with POSITION, TEXCOORD_0, NORMAL and COLOR_0 interpolation.
-- Embedded WebP UV masking, zero RGBA outside the mask, and lossless re-encoding.
-- Minimal GLB/B3DM reconstruction with active-reference and extension whitelisting.
-- Presigned object download/upload with source ETag, size and SHA-256 checks.
-- Long-running claim/heartbeat/complete/fail worker loop with graceful signal handling.
-- Synthetic fixtures and unit tests; no production dataset is committed.
+## 功能范围
 
-The first version accepts uncompressed TRIANGLES with one B3DM batch feature and embedded buffers.
-Draco, Meshopt, KTX2/BasisU, external glTF resources and unknown required extensions fail closed.
+### 已支持能力
 
-## Local build
+- 严格解析 B3DM v1 和内嵌 GLB 2.0，并对长度、Chunk、Table 和对齐进行边界校验；
+- 在通过完整结构校验的前提下，有限兼容 GLB 起始位置仅按四字节对齐的旧 B3DM；
+- 将 EPSG:4490 Polygon、MultiPolygon 和 Hole 投影到局部米制坐标系；
+- 使用空间索引筛选授权三角形候选集，再由精确裁切器完成三角形/棱柱裁切；
+- 对 `POSITION`、`TEXCOORD_0`、`NORMAL` 和 `COLOR_0` 执行边界插值；
+- 对内嵌 WebP 执行 UV Mask，将授权范围外像素 RGBA 全部清零并无损重编码；
+- 仅重建仍被活动 Scene 引用的 glTF 资源，并按扩展白名单输出最小 GLB/B3DM；
+- 下载时校验源对象 ETag、大小和 SHA-256，上传时校验输出大小限制；
+- 支持 claim、heartbeat、complete、fail 的长轮询任务生命周期；
+- 支持 `SIGINT`、`SIGTERM` 优雅停止和 JSON Lines 结构化日志；
+- 提供合成 B3DM/GLB 测试数据，不在仓库中保存生产数据集。
 
-Install CMake 3.24+, Ninja, a C++17 compiler, and vcpkg. Set `VCPKG_ROOT`, then run:
+### 当前输入限制
+
+- 任务内容格式必须为受支持的 B3DM + glTF 2.0，且 `gltfUpAxis` 必须显式为 `Z`；
+- 仅支持未压缩的 `TRIANGLES` Primitive 和内嵌 Buffer；
+- B3DM 仅支持 `BATCH_LENGTH=1`，不支持额外的二进制 Feature/Batch Table 语义；
+- 纹理裁切使用 `TEXCOORD_0` 和内嵌 WebP；
+- 已知 WebGL 枚举值的非标准 `sampler.wrapR` 会被校验、记录兼容性告警并从输出移除；
+- `wrapS`、`wrapT` 仍按二维纹理 Mask 的受支持模式严格校验。
+
+Draco、Meshopt、KTX2/BasisU、外部 glTF 资源、未知必需扩展及其他未明确支持的内容均会
+fail closed，不会生成 `READY` 结果。
+
+## 处理流程
+
+1. Worker 携带自身 ID 和算法版本向控制面发送 `claim` 请求。
+2. 无任务时按轮询周期等待；领取任务后启动租约 `heartbeat`。
+3. 使用控制面下发的短期预签名 URL 下载源对象，并校验大小、ETag 和 SHA-256。
+4. 校验 B3DM/GLB、任务 `gltfUpAxis` 和授权范围，执行几何、属性及纹理裁切。
+5. 无授权内容时直接上报 `EMPTY`，不创建零字节占位对象。
+6. 有授权内容时重建并复核 B3DM，通过预签名 URL 上传，然后上报 `READY` 及对象摘要。
+7. 任一阶段失败时按错误类型和重试语义调用 `fail`；无法安全解析的 claim 响应不会继续处理，
+   其租约由控制面的超时机制恢复。
+
+Worker 自身不监听端口，仅主动访问元数据控制面和控制面下发的对象存储预签名 URL。所有控制面
+请求都会携带内部来源 Header `from-source: inner`。
+
+## 项目结构
+
+```text
+.
+├── include/clip_worker/       # 公共头文件
+├── src/
+│   ├── app/                   # CLI 与进程入口
+│   ├── client/                # 控制面客户端和对象传输
+│   ├── clip/                  # B3DM/GLB 裁切与重建
+│   ├── formats/               # B3DM、GLB 严格解析
+│   ├── geometry/              # 投影、空间索引和三角形裁切
+│   ├── logging/               # JSON Lines 结构化日志
+│   └── task/                  # 任务契约和 Worker 生命周期
+├── tests/                     # GoogleTest 单元测试和合成 Tile
+├── docker/offline/            # 离线依赖包准备、导入和构建脚本
+├── CMakeLists.txt             # CMake 工程定义
+├── CMakePresets.json          # 本地及 Linux 双架构 Preset
+├── vcpkg.json                 # 第三方依赖清单
+├── Dockerfile                 # 在线多阶段构建
+├── Dockerfile.base            # 在线生成离线基础镜像
+├── Dockerfile.offline         # 无网络应用镜像构建
+├── compose.yaml               # 常规运行编排
+└── compose.offline.yaml       # 离线构建覆盖配置
+```
+
+## 本地开发
+
+### 环境要求
+
+- CMake 3.24 或更高版本；
+- Ninja；
+- 支持 C++17 的编译器；
+- vcpkg，并设置环境变量 `VCPKG_ROOT`。
+
+项目依赖由 `vcpkg.json` 声明，包括 libcurl、nlohmann/json、OpenSSL、PROJ、libwebp、
+earcut.hpp 和 GoogleTest。
+
+### 编译与测试
+
+Debug 构建：
 
 ```powershell
+$env:VCPKG_ROOT = "<vcpkg-directory>"
 cmake --preset debug
 cmake --build --preset debug
 ctest --preset debug
 ```
 
-## Worker configuration
+Release 构建：
 
-The container starts the `run` command by default. Required deployment variables are:
+```powershell
+cmake --preset release
+cmake --build --preset release
+ctest --preset release
+```
 
-| Variable | Purpose |
-| --- | --- |
-| `CLIP_WORKER_CONTROL_PLANE_URL` | Base URL of the metadata control plane |
-| `CLIP_WORKER_ID` | Unique worker/pod identifier; falls back to `HOSTNAME` |
+Linux 原生环境还可以显式选择生产目标 triplet：
 
-Optional variables are `CLIP_WORKER_AUTHORIZATION_HEADER`,
-`CLIP_WORKER_ALGORITHM_VERSION` (default `v4`), `CLIP_WORKER_MAX_INPUT_BYTES`,
-`CLIP_WORKER_MAX_OUTPUT_BYTES`, `CLIP_WORKER_POLL_INTERVAL_SECONDS`,
-`CLIP_WORKER_HEARTBEAT_INTERVAL_SECONDS`, and the
-`CLIP_WORKER_API_*_TIMEOUT_SECONDS` / `CLIP_WORKER_TRANSFER_*_TIMEOUT_SECONDS` settings.
-`CLIP_WORKER_LOG_LEVEL` accepts `DEBUG`, `INFO`, `WARN`, or `ERROR` and defaults to `INFO`.
-The authorization value is a complete HTTP header such as `Authorization: Bearer ...`; never put it
-in an image layer or log output.
+```sh
+cmake --preset x64-linux-release       # amd64 主机
+cmake --build --preset x64-linux-release
+ctest --preset x64-linux-release
 
-## Structured logs
+cmake --preset arm64-linux-release     # arm64 主机
+cmake --build --preset arm64-linux-release
+ctest --preset arm64-linux-release
+```
 
-The worker writes one JSON object per event with a UTC millisecond `timestamp`, `level`, stable
-`event` name and human-readable `message`. Task events also include `workerId` and `assetId`.
-Successful tasks end with exactly one `task.succeeded` event containing `READY` or `EMPTY`, total
-duration, object sizes, and clipping statistics. Failed tasks end with exactly one `task.failed`
-event containing the failed stage, error type and code, retryability, duration, and whether the
-failure was reported to the control plane.
+`x64-linux-release` 和 `arm64-linux-release` 用于各自架构的原生构建，不代表项目内置了
+QEMU 交叉运行环境。
 
-The default `INFO` level records task claims, completed download/clip/upload phases, final results,
-and all warnings and errors. `DEBUG` additionally records empty polls, successful heartbeats, and
-phase starts. Logs never include authorization headers, lease tokens, presigned URLs, claim or HTTP
-response bodies, scope WKB, output hashes, or ETags.
+### CLI 命令
 
-Legacy B3DM whose header-declared embedded GLB is four-byte aligned but not eight-byte aligned is
-accepted only when the GLB length, chunks and content pass all existing strict validation. Such an
-asset emits one `source.compatibility_warning` WARN event with compatibility code
-`B3DM_NONCONFORMANT_ALIGNMENT` and numeric alignment diagnostics. Non-empty output is always
-rebuilt with an eight-byte-aligned GLB start and tile length.
+```text
+3d-tiles-clip-worker --version
+3d-tiles-clip-worker inspect <tile.b3dm>
+3d-tiles-clip-worker run
+```
 
-Producer-added glTF sampler `wrapR` is accepted only when it is an unsigned known WebGL wrap
-enum. The field has no meaning for the Worker's two-dimensional `TEXCOORD_0` mask, so it is
-validated, reported once as `GLTF_NONSTANDARD_SAMPLER_WRAP_R`, ignored during masking, and removed
-from normalized output. Invalid `wrapR` values and unsupported `wrapS`/`wrapT` modes still fail
-closed.
+- `--version`：输出程序版本；
+- `inspect`：严格解析最大 512 MiB 的 B3DM，并输出不含二进制内容和签名 URL 的 JSON 结构摘要；
+- `run`：读取环境变量并启动常驻 Worker。
 
-Follow application events directly, or add Docker's receive timestamp for comparison:
+Windows Debug 构建示例：
+
+```powershell
+& .\build\debug\3d-tiles-clip-worker.exe --version
+& .\build\debug\3d-tiles-clip-worker.exe inspect .\sample.b3dm
+```
+
+## Worker 配置
+
+### 运行变量
+
+| 变量 | 是否必填 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `CLIP_WORKER_CONTROL_PLANE_URL` | 是 | 无 | 元数据控制面基础 URL，必须能从 Worker 容器访问 |
+| `CLIP_WORKER_ID` | 否 | `HOSTNAME`/`COMPUTERNAME` | Worker 唯一标识；Compose 扩容时建议留空 |
+| `CLIP_WORKER_AUTHORIZATION_HEADER` | 否 | 空 | 完整 HTTP Header，例如 `Authorization: Bearer ...` |
+| `CLIP_WORKER_ALGORITHM_VERSION` | 否 | `v4` | 必须与控制面的裁切算法版本一致 |
+| `CLIP_WORKER_MAX_INPUT_BYTES` | 否 | `67108864` | 单个输入对象最大字节数，必须为正整数 |
+| `CLIP_WORKER_MAX_OUTPUT_BYTES` | 否 | `67108864` | 单个输出对象最大字节数，必须为正整数 |
+| `CLIP_WORKER_POLL_INTERVAL_SECONDS` | 否 | `5` | 空任务或领取失败后的轮询间隔，单位为秒 |
+| `CLIP_WORKER_HEARTBEAT_INTERVAL_SECONDS` | 否 | `30` | 租约心跳间隔，单位为秒 |
+| `CLIP_WORKER_API_CONNECT_TIMEOUT_SECONDS` | 否 | `10` | 控制面连接超时，单位为秒 |
+| `CLIP_WORKER_API_REQUEST_TIMEOUT_SECONDS` | 否 | `30` | 控制面请求超时，单位为秒 |
+| `CLIP_WORKER_TRANSFER_CONNECT_TIMEOUT_SECONDS` | 否 | `10` | 对象存储连接超时，单位为秒 |
+| `CLIP_WORKER_TRANSFER_REQUEST_TIMEOUT_SECONDS` | 否 | `300` | 对象下载/上传请求超时，单位为秒 |
+| `CLIP_WORKER_LOG_LEVEL` | 否 | `INFO` | 可选 `DEBUG`、`INFO`、`WARN`、`ERROR` |
+
+`CLIP_WORKER_AUTHORIZATION_HEADER` 是完整 Header，而不是只填写 Token。不要把它写入镜像层、
+README、日志或提交到版本库。
+
+### Compose 与构建变量
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `COMPOSE_PROJECT_NAME` | `three-d-tiles-clip-worker` | Compose 项目名 |
+| `CLIP_WORKER_IMAGE` | `3d-tiles-clip-worker:0.1.3` | 构建或部署的 Worker 镜像 |
+| `CLIP_WORKER_STOP_GRACE_PERIOD` | `10m` | 收到 `SIGTERM` 后允许在途任务完成的时间 |
+| `CLIP_WORKER_LOG_MAX_SIZE` | `10m` | 单个 Docker 日志文件大小上限 |
+| `CLIP_WORKER_LOG_MAX_FILES` | `5` | Docker 日志文件保留数量 |
+| `CLIP_WORKER_BASE_IMAGE` | `ubuntu:24.04` | 在线构建或离线基础镜像构建使用的 Ubuntu 镜像 |
+| `CLIP_WORKER_APT_MIRROR` | 空 | 仅供 `Dockerfile.base` 使用的 Ubuntu 软件源覆盖地址 |
+| `CLIP_WORKER_VCPKG_REF` | `2025.07.25` | 固定的 vcpkg 版本 |
+| `CLIP_WORKER_VCPKG_REPOSITORY` | vcpkg 官方 GitHub 仓库 | vcpkg 仓库或批准的镜像地址 |
+| `CLIP_WORKER_VCPKG_ASSET_PREFIX` | `https://github.com` | vcpkg tool 下载前缀 |
+| `CLIP_WORKER_VCPKG_GITHUB_ASSET_PREFIX` | 空 | GitHub 依赖资产代理前缀 |
+| `CLIP_WORKER_VCPKG_SQLITE_MIRROR_PREFIX` | 空 | SQLite 依赖资产镜像前缀 |
+| `CLIP_WORKER_DEPS_VERSION` | `ubuntu24.04-vcpkg2025.07.25-r1` | 离线依赖版本 |
+| `CLIP_WORKER_BUILD_BASE_IMAGE` | 带版本和架构的本地镜像 | 离线编译基础镜像 |
+| `CLIP_WORKER_RUNTIME_BASE_IMAGE` | 带版本和架构的本地镜像 | 离线运行基础镜像 |
+
+敏感运行配置应写入本地 `.env` 或部署系统的 Secret。项目已忽略 `.env`，但不会阻止误写到其他
+受版本控制的文件中。
+
+## 结构化日志
+
+Worker 每个事件输出一行 JSON，包含 UTC 毫秒时间 `timestamp`、`level`、稳定的 `event` 名称和
+便于阅读的 `message`。任务相关事件还包含 `workerId` 和 `assetId`。
+
+- `INFO`：记录任务领取、下载/裁切/上传完成、最终结果、警告和错误；
+- `DEBUG`：额外记录空轮询、成功心跳和各阶段开始事件；
+- 成功任务只产生一个终态 `task.succeeded`，包含 `READY` 或 `EMPTY`、耗时、对象大小和裁切统计；
+- 失败任务只产生一个终态 `task.failed`，包含阶段、错误类型、错误码、可重试性、耗时以及是否成功
+  上报控制面。
+
+日志不会记录授权 Header、租约 Token、预签名 URL、claim/HTTP 响应正文、授权范围 WKB、输出
+SHA-256 或 ETag。
+
+已通过严格校验但使用旧式四字节 B3DM 对齐的输入会产生一次
+`source.compatibility_warning`，兼容码为 `B3DM_NONCONFORMANT_ALIGNMENT`。合法但非标准的
+`sampler.wrapR` 会产生一次兼容性告警 `GLTF_NONSTANDARD_SAMPLER_WRAP_R`。非空输出始终按标准
+八字节边界重建。
+
+查看日志：
 
 ```powershell
 docker compose logs --follow clip-worker
 docker compose logs --follow --timestamps clip-worker
 ```
 
-## Docker
+## Docker 构建
 
-Build and test the current Docker platform:
+`Dockerfile` 会在 build 阶段安装固定 vcpkg 依赖、编译 Release 版本并执行完整 CTest；测试失败时
+不会生成运行镜像。运行镜像仅包含程序、运行库和 PROJ 数据。
+
+构建当前 Docker 平台：
 
 ```powershell
 docker build --tag 3d-tiles-clip-worker:dev .
 ```
 
-Build and push both production architectures:
+构建并推送 Linux amd64/arm64 多平台镜像：
 
 ```powershell
-docker buildx build --platform linux/amd64,linux/arm64 --tag <registry>/3d-tiles-clip-worker:<version> --push .
+docker buildx build --platform linux/amd64,linux/arm64 `
+  --tag <registry>/3d-tiles-clip-worker:<version> --push .
 ```
 
-The multi-platform build uses the explicit vcpkg triplets `x64-linux` and `arm64-linux`, runs the
-complete test suite in each build stage, and copies vcpkg runtime libraries plus PROJ data into the
-matching final image. Every control-plane request includes the required internal header
-`from-source: inner`.
+也可以使用项目提供的 Bake 定义：
 
-## Offline native build
-
-The offline build separates stable dependencies from frequently changing Worker source code:
-
-- `build-base` contains the compiler, CMake, Ninja, the pinned vcpkg toolchain and all development
-  dependencies from `vcpkg.json`.
-- `runtime-base` contains only CA certificates, system runtime libraries, PROJ data and UID 10001.
-- `Dockerfile.offline` compiles the current source and runs all CTest cases, then copies only the
-  installed Worker files into `runtime-base`.
-
-The dependency bundle and Worker project directory are separate deliverables. Generate one bundle
-on a connected native amd64 Linux host and another on a connected native arm64 Linux host. QEMU,
-binfmt, ARMv7 and other 32-bit targets are intentionally unsupported.
-
-Native dependency-bundle preparation and offline application builds support Docker's classic
-builder and do not require the buildx plugin. Cross-architecture or combined multi-platform
-registry builds still require buildx, as shown in the Docker section above.
-
-### Prepare a dependency bundle online
-
-Run from a connected Linux checkout. The output directory must be empty and should be outside the
-Docker build context:
-
-```sh
-chmod +x docker/offline/*.sh
-./docker/offline/prepare-bundle.sh /srv/offline-bundles/clip-worker-deps
+```powershell
+docker buildx bake -f docker-bake.hcl `
+  --set "worker.tags=<registry>/3d-tiles-clip-worker:<version>" --push
 ```
 
-Do not prefix this command with `DOCKER_BUILDKIT=1` on a host without buildx. If that variable is
-already exported, run `unset DOCKER_BUILDKIT`; the script will then use the supported classic
-builder path and pass the detected native `amd64` or `arm64` architecture explicitly.
+多平台构建分别使用 `x64-linux` 和 `arm64-linux` vcpkg triplet，并在各自 build stage 中执行
+测试。发布后应检查远程 manifest 同时包含 `linux/amd64`、`linux/arm64`，且不包含 ARMv7。
 
-If Docker Hub or GitHub is not reachable from a China-based build host, select the explicit
-domestic mirror profile:
+## Docker Compose 部署
 
-```sh
-./docker/offline/prepare-bundle.sh --mirror-profile cn \
-  /srv/offline-bundles/clip-worker-arm64-r1
-```
-
-The `cn` profile uses the pinned multi-architecture Ubuntu 24.04 OCI index from DaoCloud, routes
-the pinned vcpkg repository, tool and GitHub assets through `gh-proxy.com`, and uses Aliyun mirrors
-for SQLite and Ubuntu packages. It selects `http://mirrors.aliyun.com/ubuntu` on amd64 and
-`http://mirrors.aliyun.com/ubuntu-ports` on arm64. HTTP is required for the initial package index
-because the minimal Ubuntu base does not yet contain CA certificates; Ubuntu `InRelease`
-signatures and package hashes remain mandatory. The profile has been checked for a
-`linux/arm64/v8` Ubuntu manifest. It does not disable any vcpkg tool, source asset, APT signature,
-manifest or bundle checksum validation. The original single-argument command continues to use
-official sources.
-
-The script builds architecture-suffixed `build-base` and `runtime-base` images, validates their
-platform and labels, exercises their required files with networking disabled, and writes:
-
-```text
-clip-worker-deps/
-  build-base-<deps-version>-<arch>.tar
-  runtime-base-<deps-version>-<arch>.tar
-  manifest.properties
-  SHA256SUMS
-  README.md
-```
-
-Classic-builder compatibility means dependency downloads are not stored in BuildKit cache mounts.
-Because bundle preparation also uses `--no-cache`, a failed preparation attempt may download the
-vcpkg dependencies again when retried.
-
-Build mirrors can be supplied through the existing `CLIP_WORKER_BASE_IMAGE` and
-`CLIP_WORKER_VCPKG_*` environment variables. `CLIP_WORKER_APT_MIRROR` overrides the architecture
-specific package mirror used by `Dockerfile.base`. Never put credentials in those values because
-image build arguments, bundle manifests and layers are not secret stores. Explicit environment
-values override the chosen mirror profile, which allows an approved internal Registry or proxy to
-replace any public mirror. There is no automatic public-mirror fallback.
-
-### Load and build without a network
-
-Copy the matching bundle and the Worker project directory to the offline Linux host. From the
-project root, verify every bundle file, verify the native architecture and manifest, and load the
-two base images:
-
-```sh
-./docker/offline/load-bundle.sh /media/offline/clip-worker-deps
-```
-
-Build and smoke-test a fresh application image. This command always disables network access,
-remote pulls and Docker build-step cache:
-
-```sh
-./docker/offline/build.sh 3d-tiles-clip-worker:0.1.3
-```
-
-The build fails before compilation if the current `vcpkg.json` SHA-256 differs from the manifest
-embedded in `build-base`. Changes under `include/`, `src/`, `tests/` or the CMake project reuse the
-same base images. Changes to `vcpkg.json`, Ubuntu, vcpkg, the compiler baseline or dependency build
-options require a new dependency version and new native bundles for both architectures.
-
-Version `0.1.3` does not change `vcpkg.json` or the dependency toolchain, so the existing matching
-amd64/arm64 offline bundles remain valid. Copy the updated project source and build only the final
-application image. Deploy metadata property `auth.three-d-clip.algorithm-version=v4` and Worker
-environment `CLIP_WORKER_ALGORITHM_VERSION=v4` together. Development-only `v1`-`v3` clip
-derivatives may be cleaned after exact target inventory; the control plane creates a new `v4`
-preparation/job through algorithm-drift reconciliation.
-
-To use Docker Compose for the offline application build, set the architecture-matching
-`CLIP_WORKER_BUILD_BASE_IMAGE` and `CLIP_WORKER_RUNTIME_BASE_IMAGE` values in `.env`, then run:
-
-```sh
-docker compose -f compose.yaml -f compose.offline.yaml config
-docker compose -f compose.yaml -f compose.offline.yaml build --no-cache
-docker compose up --detach --no-build
-```
-
-The first two commands use `Dockerfile.offline`, `network: none` and `pull: false`. The final
-runtime command uses the normal Compose service and its existing read-only root filesystem,
-capability, log rotation and stop-grace-period settings.
-
-## Docker Compose
-
-The Compose service has no inbound ports. It only calls the metadata control plane and the MinIO
-presigned URLs returned by that control plane. Create the local deployment configuration and
-validate all required variables before starting:
+服务不映射入站端口。复制示例配置并填写实际控制面地址：
 
 ```powershell
 Copy-Item .env.example .env
 docker compose config
 ```
 
-For a native build on the current amd64 or arm64 host, run:
+`CLIP_WORKER_CONTROL_PLANE_URL` 缺失时，`docker compose config` 会直接失败。
+
+### 本机原生架构构建并启动
 
 ```powershell
 docker compose build
 docker compose up --detach
 ```
 
-The Dockerfile runs all CTest cases during the build. Compose intentionally does not set
-`platform`, so a native build uses the host architecture and a registry image uses the matching
-entry from its multi-platform manifest.
+Compose 不固定 `platform`：源码构建使用宿主机原生架构，从 Registry 拉取时由 Docker 选择多平台
+manifest 中匹配的架构。
 
-For a production image that has already been pushed to the registry, set `CLIP_WORKER_IMAGE` in
-`.env`, then deploy without rebuilding:
+### 使用 Registry 镜像部署
+
+在 `.env` 中将 `CLIP_WORKER_IMAGE` 设置为不可变的生产版本，然后执行：
 
 ```powershell
 docker compose pull
 docker compose up --detach --no-build
 ```
 
-Use the following commands for routine operations:
+### 常用运维命令
 
 ```powershell
 docker compose ps
@@ -259,16 +282,17 @@ docker compose stop
 docker compose down
 ```
 
-Leave `CLIP_WORKER_ID` empty when scaling so each replica uses its unique Docker `HOSTNAME`.
-The container runs as UID 10001 with a read-only root filesystem, no Linux capabilities and no
-new privileges. The default ten-minute stop grace period allows an in-flight task to finish after
-SIGTERM; tune it to the production maximum processing time. Do not store authorization headers in
-the image or commit the local `.env` file.
+扩容时保持 `CLIP_WORKER_ID` 为空，使每个副本使用不同的 Docker `HOSTNAME`。容器以 UID `10001`
+运行，根文件系统只读，删除全部 Linux capabilities，启用 `no-new-privileges`，并限制 Docker 日志
+文件大小和数量。
 
-### Replica rollout and rollback
+默认停止宽限期为十分钟。收到 `SIGTERM` 后 Worker 会停止领取新任务，并尽量完成在途任务；超出
+宽限期后未完成租约由控制面的既有超时路径恢复。生产环境应根据单个任务最长处理时间调整
+`CLIP_WORKER_STOP_GRACE_PERIOD`。
 
-Keep the application default at one replica. For a fixed new job, fixed scope and equal total CPU
-and memory accounting, run one, two and four replicas in order:
+### 副本扩容与回滚
+
+应用默认保持一个副本。对固定任务、固定授权范围和相同总资源口径，建议依次验证：
 
 ```powershell
 docker compose up --detach --no-build --scale clip-worker=1
@@ -276,21 +300,115 @@ docker compose up --detach --no-build --scale clip-worker=2
 docker compose up --detach --no-build --scale clip-worker=4
 ```
 
-Do not set a shared `CLIP_WORKER_ID` while scaling. Before moving to the next level, let the fixed
-job reach a truthful terminal state and record completed assets per minute, download/clip/upload
-P95 and P99, retry/failure counts, per-replica peak memory, total CPU, MinIO throughput and errors,
-metadata claim/heartbeat/complete latency, and PostgreSQL lock waits. Stop increasing replicas when
-throughput no longer improves materially or any correctness, failure, memory, object-store or
-control-plane metric regresses. Account for memory as peak memory per replica multiplied by the
-replica count; CPU count alone is not a safe sizing rule.
+每一级都应等待任务真实到达终态，并记录每分钟完成资产数、下载/裁切/上传 P95 与 P99、重试和失败
+次数、单副本峰值内存、总 CPU、MinIO 吞吐与错误、控制面 claim/heartbeat/complete 延迟以及
+PostgreSQL 锁等待。当吞吐不再明显提升或任何正确性、失败率、内存、对象存储、数据库或控制面指标
+恶化时停止扩容。
 
-To roll back capacity without changing job data, return to the last safe count, usually one:
+回滚容量时只恢复到上一个安全副本数，例如：
 
 ```powershell
 docker compose up --detach --no-build --scale clip-worker=1
 ```
 
-Compose sends `SIGTERM` and honors `CLIP_WORKER_STOP_GRACE_PERIOD`. An in-flight asset may complete
-during that interval; if a process cannot finish, the existing lease expiry path makes the asset
-claimable again. Do not reset jobs or READY assets during replica rollback. Metadata and every
-running Worker must advertise the same algorithm version, currently `v4`.
+副本回滚不需要重置任务或 `READY` 资产。控制面和全部运行中的 Worker 必须使用相同算法版本，
+当前为 `v4`。
+
+## 离线构建与交付
+
+离线流程把稳定依赖与频繁变化的 Worker 源码分开：
+
+- `build-base`：包含编译器、CMake、Ninja、固定 vcpkg toolchain 和 `vcpkg.json` 的开发依赖；
+- `runtime-base`：仅包含 CA 证书、系统运行库、PROJ 数据和 UID `10001`；
+- `Dockerfile.offline`：复制当前源码、执行编译和完整 CTest，再把安装结果复制到
+  `runtime-base`。
+
+amd64 与 arm64 依赖包必须分别在联网的原生 Linux 主机生成，并只在相同架构的离线主机使用。
+该流程不依赖 QEMU/binfmt，也不支持交叉架构复用。依赖包和 Worker 项目源码是两个独立交付物。
+
+### 在联网主机准备依赖包
+
+从项目根目录执行。输出目录必须为空，且建议放在 Docker build context 之外：
+
+```sh
+chmod +x docker/offline/*.sh
+./docker/offline/prepare-bundle.sh /srv/offline-bundles/clip-worker-deps
+```
+
+脚本会检测原生 `amd64` 或 `arm64`，构建和验证两个基础镜像，并输出：
+
+```text
+clip-worker-deps/
+├── build-base-<deps-version>-<arch>.tar
+├── runtime-base-<deps-version>-<arch>.tar
+├── manifest.properties
+├── SHA256SUMS
+└── README.md
+```
+
+中国大陆网络环境可以显式选择 `cn` 镜像配置：
+
+```sh
+./docker/offline/prepare-bundle.sh --mirror-profile cn \
+  /srv/offline-bundles/clip-worker-deps
+```
+
+`cn` 配置使用固定的多架构 Ubuntu 镜像索引以及明确配置的 GitHub、SQLite 和 Ubuntu 镜像，
+但不会关闭 vcpkg tool、源资产、APT 签名、manifest 或 bundle 摘要校验。显式设置的
+`CLIP_WORKER_BASE_IMAGE`、`CLIP_WORKER_APT_MIRROR` 和 `CLIP_WORKER_VCPKG_*` 变量优先于
+profile，便于替换为批准的内部 Registry 或代理。镜像地址和构建参数不是 Secret 存储位置，不要
+在其中加入凭据。
+
+脚本兼容 Docker classic builder。没有 buildx 的主机不要强制设置 `DOCKER_BUILDKIT=1`；如果该
+变量已经全局导出，请先执行 `unset DOCKER_BUILDKIT`。由于依赖准备使用 `--no-cache`，失败重试时
+可能重新下载依赖。
+
+### 在离线主机导入并构建
+
+将匹配架构的依赖包和当前 Worker 项目目录复制到离线主机。在项目根目录执行：
+
+```sh
+./docker/offline/load-bundle.sh /media/offline/clip-worker-deps
+./docker/offline/build.sh 3d-tiles-clip-worker:0.1.3
+```
+
+`load-bundle.sh` 在导入前校验 `SHA256SUMS`、bundle manifest、宿主架构、镜像 ID/标签及当前
+`vcpkg.json` 的 SHA-256。`build.sh` 强制使用 `--network none --pull=false --no-cache`，完成
+Release 编译、CTest、镜像架构、运行 UID、PROJ 数据和“不包含构建工具链”的检查。
+
+只修改 `include/`、`src/`、`tests/` 或 CMake 工程文件时可以复用基础镜像。修改
+`vcpkg.json`、Ubuntu 基线、vcpkg 版本、编译器或依赖构建选项后，必须提升依赖版本，并在
+amd64、arm64 联网主机重新生成各自的 bundle。
+
+### 使用 Compose 执行离线构建
+
+在 `.env` 中设置与本机架构匹配的 `CLIP_WORKER_BUILD_BASE_IMAGE` 和
+`CLIP_WORKER_RUNTIME_BASE_IMAGE`，然后执行：
+
+```sh
+docker compose -f compose.yaml -f compose.offline.yaml config
+docker compose -f compose.yaml -f compose.offline.yaml build --no-cache
+docker compose up --detach --no-build
+```
+
+前两条命令使用 `Dockerfile.offline`、`network: none` 和 `pull: false`；最后一条使用
+`compose.yaml` 中的既有运行安全策略。
+
+## 安全与生产注意事项
+
+- Worker 只使用控制面下发的短期预签名 URL，不持有 MinIO 长期访问凭据；
+- 不要把 `.env`、授权 Header、Registry 凭据、预签名 URL 或真实生产数据写入镜像和仓库；
+- 原始 3D Tiles、索引、授权状态、审计状态和非本 Worker 对象不属于 Worker 清理范围；
+- 算法升级或回滚时，控制面配置与所有 Worker 的 `CLIP_WORKER_ALGORITHM_VERSION` 必须同步；
+- `READY` 输出不得被重新标记为另一算法版本；失败结果不得回退为边界原始 content；
+- 生产发布前应分别验证 amd64/arm64 镜像、远程 manifest、控制面/MinIO 全链路、停止恢复和目标
+  数据集下的资源与吞吐指标。
+
+## 当前验证状态
+
+项目既有 Spec 记录：`0.1.3` 的 amd64 离线 Release 镜像曾在禁用网络、拉取和构建缓存的条件下
+完成构建，61 项 CTest 全部通过；最终镜像以 UID `10001` 运行，包含 PROJ 数据且不包含构建
+toolchain。
+
+该记录不替代目标环境验收。当前仍需在原生 arm64 环境执行同版本完整实构建，并使用代表性生产
+数据验证端到端正确性、吞吐、峰值内存、对象存储压力、控制面延迟和多副本扩展效果。

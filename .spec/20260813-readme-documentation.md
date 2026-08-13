@@ -93,3 +93,48 @@ README 应成为开发、构建、部署和运维该 Worker 的统一入口，�
 6. 使用文本检查确认 `.env.example` 的运行变量均在 README 中有说明；
 7. 本次仅修改文档，不因 README 任务重新编译 C++ 工程；如发现命令或配置存在实际错误，先记录
    差异并与用户确认是否扩大到代码或部署文件修改。
+
+## 用户确认
+
+用户已于 2026-08-13 确认采用建议方案：将现有 `README.md` 整体整理为中文，保留命令、环境
+变量、日志事件、格式名和其他技术标识的英文原文，不另建重复的英文 README。
+
+## 实施结果
+
+本次在不改变项目结构和程序行为的前提下完成以下文档调整：
+
+1. 将现有英文 README 重组为中文主文档，并保留原文档中已经存在的在线 Docker、离线交付、
+   Compose 运维、结构化日志和扩缩容说明；
+2. 增加 Worker 与控制面的完整任务生命周期，明确 `READY`、`EMPTY` 和失败路径；
+3. 增加项目目录结构，说明应用入口、控制面客户端、裁切器、格式解析、几何索引、日志、任务运行时、
+   测试和离线脚本的职责；
+4. 增加 `--version`、`inspect <tile.b3dm>` 和 `run` 三个 CLI 入口及本地使用示例，并注明
+   `inspect` 的 512 MiB 输入上限和脱敏结构摘要行为；
+5. 将运行变量整理为必填项、默认值、单位和用途明确的表格，并单独整理 Compose、在线构建及离线
+   构建变量；
+6. 明确输入支持边界，包括 `gltfUpAxis=Z`、未压缩 `TRIANGLES`、内嵌 Buffer、
+   `BATCH_LENGTH=1`、`TEXCOORD_0` 和内嵌 WebP；
+7. 明确 Draco、Meshopt、KTX2/BasisU、外部 glTF 资源和未知必需扩展等内容 fail closed；
+8. 保留并澄清结构化日志终态、敏感字段脱敏、旧 B3DM 对齐和非标准 `wrapR` 的兼容性告警；
+9. 完善 Docker 当前平台构建、显式 `docker-bake.hcl` 双架构 Bake、Compose 部署、扩容、停止和
+   容量回滚命令；
+10. 完善联网准备依赖包、`official|cn` 镜像配置、bundle 校验导入、强制断网构建、基础镜像失效
+    条件和 Compose 离线构建说明；
+11. 将既有 61 项 amd64 CTest 记录与尚未完成的 arm64 同版本实构建、真实数据全链路和生产性能
+    验收明确区分，未把历史验证表述为当前环境重新验收。
+
+## 文档校验结果
+
+1. `README.md` 已通过严格 UTF-8 解码检查；
+2. Markdown 共 42 个代码围栏，开始与结束数量匹配；
+3. `.env.example` 中解析到的 28 个变量均可在 README 中找到对应说明；
+4. README 记录的程序/CMake 版本 `0.1.3` 与 `src/app/main.cpp`、`CMakeLists.txt` 一致；
+5. README 记录的默认算法版本 `v4` 与 `WorkerRuntimeConfig` 一致；
+6. 文档列出的 12 个主要目录和工程文件均真实存在；
+7. `docker compose --env-file .env.example config --quiet` 配置展开成功；Docker 客户端因当前用户
+   无权读取其全局 `config.json` 输出警告，但命令退出码为 0，未影响 Compose 校验；
+8. `docker buildx bake -f docker-bake.hcl --print` 成功展开 `worker` target，且只包含
+   `linux/amd64`、`linux/arm64`；同样存在 Docker 全局配置读取警告，但 Bake 定义校验成功；
+9. 本次未修改 C++、CMake、Docker 或 Compose 行为，因此按已确认验收范围未重新执行编译、CTest
+   或镜像构建；
+10. `D:/code/3d-tiles-clip-worker` 当前不是独立 Git 仓库，没有执行 `git add`。
