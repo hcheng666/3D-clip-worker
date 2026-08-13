@@ -1,0 +1,9 @@
+services:
+  clip-worker:
+    build:
+      dockerfile: Dockerfile.offline
+      pull: false
+      network: none
+      args:
+        BUILD_BASE_IMAGE: ${CLIP_WORKER_BUILD_BASE_IMAGE:?CLIP_WORKER_BUILD_BASE_IMAGE is required}
+        RUNTIME_BASE_IMAGE: ${CLIP_WORKER_RUNTIME_BASE_IMAGE:?CLIP_WORKER_RUNTIME_BASE_IMAGE is required}

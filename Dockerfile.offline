@@ -1,0 +1,51 @@
+# Valid sentinel defaults keep Dockerfile static checks clean; real builds must override both tags.
+ARG BUILD_BASE_IMAGE=3d-tiles-clip-worker-build-base:required
+ARG RUNTIME_BASE_IMAGE=3d-tiles-clip-worker-runtime-base:required
+
+FROM ${BUILD_BASE_IMAGE} AS build
+
+ARG TARGETARCH
+
+WORKDIR /src
+COPY vcpkg.json ./vcpkg.json
+
+# Refuse to compile against a dependency base built from another manifest.
+RUN test -s /opt/clip-worker-deps/vcpkg.json.sha256 \
+    && echo "$(cat /opt/clip-worker-deps/vcpkg.json.sha256)  /src/vcpkg.json" \
+        | sha256sum --check --strict
+
+COPY CMakeLists.txt CMakePresets.json ./
+COPY include include
+COPY src src
+COPY tests tests
+
+RUN RESOLVED_TARGETARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
+    && case "${RESOLVED_TARGETARCH}" in \
+        amd64) VCPKG_TARGET_TRIPLET=x64-linux ;; \
+        arm64) VCPKG_TARGET_TRIPLET=arm64-linux ;; \
+        *) echo "Unsupported TARGETARCH: ${RESOLVED_TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && test -d "/opt/clip-worker-deps/vcpkg_installed/${VCPKG_TARGET_TRIPLET}" \
+    && cmake -S . -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake \
+        -DVCPKG_MANIFEST_MODE=OFF \
+        -DVCPKG_TARGET_TRIPLET="${VCPKG_TARGET_TRIPLET}" \
+        -DVCPKG_INSTALLED_DIR=/opt/clip-worker-deps/vcpkg_installed \
+        -DCLIP_WORKER_BUILD_TESTS=ON \
+    && cmake --build build --parallel \
+    && ctest --test-dir build --output-on-failure \
+    && cmake --install build --prefix /opt/clip-worker \
+    && mkdir -p /opt/clip-worker/lib
+
+FROM ${RUNTIME_BASE_IMAGE} AS runtime
+
+COPY --from=build /opt/clip-worker/bin/3d-tiles-clip-worker /usr/local/bin/3d-tiles-clip-worker
+COPY --from=build /opt/clip-worker/lib/ /usr/local/lib/
+
+ENV LD_LIBRARY_PATH=/usr/local/lib \
+    PROJ_DATA=/usr/local/share/proj
+
+USER 10001
+ENTRYPOINT ["/usr/local/bin/3d-tiles-clip-worker"]
+CMD ["run"]

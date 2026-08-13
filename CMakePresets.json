@@ -1,0 +1,98 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "vcpkg-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "debug",
+      "inherits": "vcpkg-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CLIP_WORKER_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "vcpkg-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CLIP_WORKER_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "x64-linux-release",
+      "inherits": "release",
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "x64-linux"
+      }
+    },
+    {
+      "name": "arm64-linux-release",
+      "inherits": "release",
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "arm64-linux"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "x64-linux-release",
+      "configurePreset": "x64-linux-release"
+    },
+    {
+      "name": "arm64-linux-release",
+      "configurePreset": "arm64-linux-release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "x64-linux-release",
+      "configurePreset": "x64-linux-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "arm64-linux-release",
+      "configurePreset": "arm64-linux-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

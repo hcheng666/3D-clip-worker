@@ -1,0 +1,8 @@
+build/
+out/
+.cache/
+vcpkg_installed/
+offline-bundles/
+CMakeUserPresets.json
+*.log
+.env

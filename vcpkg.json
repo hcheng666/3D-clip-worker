@@ -1,0 +1,14 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "3d-tiles-clip-worker",
+  "version-string": "0.1.0",
+  "dependencies": [
+    "curl",
+    "nlohmann-json",
+    "openssl",
+    "gtest",
+    "earcut-hpp",
+    "proj",
+    "libwebp"
+  ]
+}

@@ -1,0 +1,114 @@
+ARG BASE_IMAGE=ubuntu:24.04
+ARG DEPS_VERSION=ubuntu24.04-vcpkg2025.07.25-r1
+ARG VCPKG_MANIFEST_SHA256
+
+FROM ${BASE_IMAGE} AS dependency-builder
+
+ARG TARGETARCH
+ARG DEPS_VERSION
+ARG VCPKG_MANIFEST_SHA256
+ARG APT_MIRROR
+ARG VCPKG_REF=2025.07.25
+ARG VCPKG_REPOSITORY=https://github.com/microsoft/vcpkg.git
+ARG VCPKG_ASSET_PREFIX=https://github.com
+ARG VCPKG_GITHUB_ASSET_PREFIX
+ARG VCPKG_SQLITE_MIRROR_PREFIX
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    VCPKG_DISABLE_METRICS=1 \
+    VCPKG_FORCE_SYSTEM_BINARIES=1 \
+    VCPKG_ROOT=/opt/vcpkg \
+    CLIP_WORKER_DEPS_ROOT=/opt/clip-worker-deps \
+    CLIP_WORKER_VCPKG_INSTALLED_DIR=/opt/clip-worker-deps/vcpkg_installed \
+    VCPKG_GITHUB_ASSET_PREFIX=${VCPKG_GITHUB_ASSET_PREFIX} \
+    VCPKG_SQLITE_MIRROR_PREFIX=${VCPKG_SQLITE_MIRROR_PREFIX} \
+    X_VCPKG_ASSET_SOURCES="x-script,/usr/local/bin/vcpkg-download.sh {url} {dst};x-block-origin"
+
+COPY docker/offline/configure-apt-mirror.sh /usr/local/bin/configure-apt-mirror.sh
+RUN if [ -n "${APT_MIRROR}" ]; then \
+        /bin/sh /usr/local/bin/configure-apt-mirror.sh "${APT_MIRROR}"; \
+    fi \
+    && apt-get update \
+    && apt-get install --yes --no-install-recommends \
+        build-essential ca-certificates cmake curl git ninja-build pkg-config tar unzip zip \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -f /usr/local/bin/configure-apt-mirror.sh
+
+RUN git clone --depth 1 --branch "${VCPKG_REF}" "${VCPKG_REPOSITORY}" /opt/vcpkg \
+    && . /opt/vcpkg/scripts/vcpkg-tool-metadata.txt \
+    && case "${TARGETARCH}" in \
+        amd64) VCPKG_TOOL_NAME=vcpkg-glibc; VCPKG_TOOL_SHA="${VCPKG_GLIBC_SHA}" ;; \
+        arm64) VCPKG_TOOL_NAME=vcpkg-glibc-arm64; VCPKG_TOOL_SHA="${VCPKG_GLIBC_ARM64_SHA}" ;; \
+        *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && curl --fail --location --retry 5 \
+        "${VCPKG_ASSET_PREFIX}/microsoft/vcpkg-tool/releases/download/${VCPKG_TOOL_RELEASE_TAG}/${VCPKG_TOOL_NAME}" \
+        --output /opt/vcpkg/vcpkg \
+    && echo "${VCPKG_TOOL_SHA}  /opt/vcpkg/vcpkg" | sha512sum --check --strict \
+    && chmod +x /opt/vcpkg/vcpkg \
+    && rm -rf /opt/vcpkg/.git \
+    && /opt/vcpkg/vcpkg version --disable-metrics
+
+COPY docker/vcpkg-download.sh /usr/local/bin/vcpkg-download.sh
+RUN chmod +x /usr/local/bin/vcpkg-download.sh
+
+WORKDIR /opt/clip-worker-deps
+COPY vcpkg.json ./vcpkg.json
+
+RUN test -n "${VCPKG_MANIFEST_SHA256}" \
+    && echo "${VCPKG_MANIFEST_SHA256}  /opt/clip-worker-deps/vcpkg.json" \
+        | sha256sum --check --strict \
+    && printf '%s\n' "${VCPKG_MANIFEST_SHA256}" \
+        > /opt/clip-worker-deps/vcpkg.json.sha256
+
+RUN case "${TARGETARCH}" in \
+        amd64) VCPKG_TARGET_TRIPLET=x64-linux ;; \
+        arm64) VCPKG_TARGET_TRIPLET=arm64-linux ;; \
+        *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && /opt/vcpkg/vcpkg install \
+        --triplet "${VCPKG_TARGET_TRIPLET}" \
+        --x-install-root=/opt/clip-worker-deps/vcpkg_installed \
+    && mkdir -p /opt/clip-worker-runtime/share/proj \
+    && cp -a \
+        "/opt/clip-worker-deps/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/share/proj/." \
+        /opt/clip-worker-runtime/share/proj/ \
+    && rm -rf /opt/vcpkg/buildtrees /opt/vcpkg/packages
+
+LABEL org.opencontainers.image.title="3D Tiles Clip Worker build base" \
+      com.justai.clip-worker.dependencies.version="${DEPS_VERSION}" \
+      com.justai.clip-worker.dependencies.architecture="${TARGETARCH}" \
+      com.justai.clip-worker.vcpkg.manifest-sha256="${VCPKG_MANIFEST_SHA256}"
+
+FROM dependency-builder AS build-base
+
+FROM ${BASE_IMAGE} AS runtime-base
+
+ARG TARGETARCH
+ARG DEPS_VERSION
+ARG VCPKG_MANIFEST_SHA256
+ARG APT_MIRROR
+
+COPY docker/offline/configure-apt-mirror.sh /usr/local/bin/configure-apt-mirror.sh
+RUN if [ -n "${APT_MIRROR}" ]; then \
+        /bin/sh /usr/local/bin/configure-apt-mirror.sh "${APT_MIRROR}"; \
+    fi \
+    && export DEBIAN_FRONTEND=noninteractive \
+    && apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -f /usr/local/bin/configure-apt-mirror.sh \
+    && useradd --uid 10001 --create-home --shell /usr/sbin/nologin clip-worker \
+    && mkdir -p /usr/local/lib /usr/local/share/proj
+
+COPY --from=dependency-builder /opt/clip-worker-runtime/share/proj/ /usr/local/share/proj/
+
+ENV LD_LIBRARY_PATH=/usr/local/lib \
+    PROJ_DATA=/usr/local/share/proj
+
+LABEL org.opencontainers.image.title="3D Tiles Clip Worker runtime base" \
+      com.justai.clip-worker.dependencies.version="${DEPS_VERSION}" \
+      com.justai.clip-worker.dependencies.architecture="${TARGETARCH}" \
+      com.justai.clip-worker.vcpkg.manifest-sha256="${VCPKG_MANIFEST_SHA256}"
+
+USER 10001
