@@ -6,3 +6,4 @@ offline-bundles/
 CMakeUserPresets.json
 *.log
 .env
+/.idea/
