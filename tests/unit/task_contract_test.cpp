@@ -29,19 +29,19 @@ nlohmann::json validClaimResponse() {
 }
 
 TEST(TaskContractTest, SerializesClaimCapabilities) {
-    const ClaimRequest request{"worker-a", {ContentFormat::b3dm_gltf2}, "v4", 16U * 1024U * 1024U};
+    const ClaimRequest request{"worker-a", {ContentFormat::b3dm_gltf2}, "v8", 16U * 1024U * 1024U};
 
     const auto json = nlohmann::json::parse(serializeClaimRequest(request));
 
     EXPECT_EQ(json.at("workerId"), "worker-a");
     EXPECT_EQ(json.at("supportedFormats").at(0), "B3DM_GLTF2");
-    EXPECT_EQ(json.at("algorithmVersion"), "v4");
+    EXPECT_EQ(json.at("algorithmVersion"), "v8");
 }
 
 TEST(TaskContractTest, DefaultsWorkerRuntimeToCurrentAlgorithmVersion) {
     const WorkerRuntimeConfig config;
 
-    EXPECT_EQ(config.algorithm_version, "v4");
+    EXPECT_EQ(config.algorithm_version, "v8");
 }
 
 TEST(TaskContractTest, ParsesCompleteClaimResponse) {
@@ -57,6 +57,13 @@ TEST(TaskContractTest, ParsesCompleteClaimResponse) {
     EXPECT_FALSE(task.clip_options.cap_surface);
 }
 
+TEST(TaskContractTest, ParsesProductionYUpClaimResponse) {
+    auto response = validClaimResponse();
+    response["gltfUpAxis"] = "Y";
+
+    EXPECT_EQ(parseClaimTask(response.dump()).gltf_up_axis, GltfUpAxis::y);
+}
+
 TEST(TaskContractTest, RejectsTransformWithWrongElementCount) {
     auto response = validClaimResponse();
     response["worldTransform"] = {1, 0, 0};
@@ -69,7 +76,7 @@ TEST(TaskContractTest, RejectsMissingOrUnsupportedGltfUpAxis) {
     response.erase("gltfUpAxis");
     EXPECT_THROW(static_cast<void>(parseClaimTask(response.dump())), std::invalid_argument);
 
-    for (const auto* axis : {"X", "Y", "z", ""}) {
+    for (const auto* axis : {"X", "z", ""}) {
         response = validClaimResponse();
         response["gltfUpAxis"] = axis;
         EXPECT_THROW(static_cast<void>(parseClaimTask(response.dump())), std::invalid_argument);

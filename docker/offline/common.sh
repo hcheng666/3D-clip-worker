@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DEFAULT_DEPS_VERSION="ubuntu24.04-vcpkg2025.07.25-r1"
+DEFAULT_DEPS_VERSION="ubuntu24.04-vcpkg2025.07.25-r2"
 DEFAULT_BUILD_BASE_REPOSITORY="3d-tiles-clip-worker-build-base"
 DEFAULT_RUNTIME_BASE_REPOSITORY="3d-tiles-clip-worker-runtime-base"
 DEFAULT_MIRROR_PROFILE="official"

@@ -7,9 +7,14 @@
 #include <array>
 #include <cmath>
 #include <cstring>
+#include <optional>
 #include <stdexcept>
 
 #include <nlohmann/json.hpp>
+#include <draco/attributes/geometry_attribute.h>
+#include <draco/compression/encode.h>
+#include <draco/core/encoder_buffer.h>
+#include <draco/mesh/mesh.h>
 #include <webp/encode.h>
 
 namespace clip_worker::tests {
@@ -22,6 +27,7 @@ constexpr std::size_t kTextureHeight = 8U;
 constexpr double kPi = 3.14159265358979323846;
 constexpr std::uint32_t kGlTriangles = 4U;
 constexpr std::uint32_t kGlFloat = 5126U;
+constexpr std::uint32_t kGlUnsignedInt = 5125U;
 constexpr std::uint32_t kGlArrayBuffer = 34962U;
 constexpr std::uint32_t kGlClampToEdge = 33071U;
 
@@ -179,21 +185,111 @@ std::array<double, task::ClaimTask::kWorldTransformElementCount> localEnuTransfo
             ecef_x, ecef_y, ecef_z, 1.0};
 }
 
+struct EncodedDracoMesh {
+    std::vector<std::uint8_t> bytes;
+    std::uint32_t position_unique_id = 0U;
+    std::uint32_t texture_coordinate_unique_id = 0U;
+};
+
+EncodedDracoMesh encodeDracoMesh(const std::vector<float>& positions,
+                                 const std::vector<float>& texture_coordinates) {
+    constexpr std::size_t point_count = 3U;
+    constexpr std::size_t position_components = 3U;
+    constexpr std::size_t texture_coordinate_components = 2U;
+    draco::Mesh mesh;
+    mesh.set_num_points(static_cast<std::uint32_t>(point_count));
+
+    draco::GeometryAttribute position_attribute;
+    position_attribute.Init(
+            draco::GeometryAttribute::POSITION, nullptr,
+            static_cast<std::uint8_t>(position_components), draco::DT_FLOAT32,
+            false, static_cast<std::int64_t>(position_components * sizeof(float)), 0);
+    const int position_id = mesh.AddAttribute(
+            position_attribute, true, static_cast<std::uint32_t>(point_count));
+
+    draco::GeometryAttribute texture_coordinate_attribute;
+    texture_coordinate_attribute.Init(
+            draco::GeometryAttribute::TEX_COORD, nullptr,
+            static_cast<std::uint8_t>(texture_coordinate_components),
+            draco::DT_FLOAT32, false,
+            static_cast<std::int64_t>(texture_coordinate_components * sizeof(float)), 0);
+    const int texture_coordinate_id = mesh.AddAttribute(
+            texture_coordinate_attribute, true,
+            static_cast<std::uint32_t>(point_count));
+    if (position_id < 0 || texture_coordinate_id < 0) {
+        throw std::runtime_error("Unable to create synthetic Draco attributes");
+    }
+
+    for (std::size_t point = 0U; point < point_count; ++point) {
+        mesh.attribute(position_id)->SetAttributeValue(
+                draco::AttributeValueIndex(static_cast<std::uint32_t>(point)),
+                positions.data() + point * position_components);
+        mesh.attribute(texture_coordinate_id)->SetAttributeValue(
+                draco::AttributeValueIndex(static_cast<std::uint32_t>(point)),
+                texture_coordinates.data() + point * texture_coordinate_components);
+    }
+    mesh.SetNumFaces(1U);
+    mesh.SetFace(draco::FaceIndex(0U),
+                 {draco::PointIndex(0U), draco::PointIndex(1U),
+                  draco::PointIndex(2U)});
+
+    EncodedDracoMesh result;
+    result.position_unique_id = mesh.attribute(position_id)->unique_id();
+    result.texture_coordinate_unique_id =
+            mesh.attribute(texture_coordinate_id)->unique_id();
+    draco::Encoder encoder;
+    draco::EncoderBuffer encoded;
+    const draco::Status status = encoder.EncodeMeshToBuffer(mesh, &encoded);
+    if (!status.ok()) {
+        throw std::runtime_error("Unable to encode synthetic Draco mesh: "
+                                 + status.error_msg_string());
+    }
+    const auto* first = reinterpret_cast<const std::uint8_t*>(encoded.data());
+    result.bytes.assign(first, first + encoded.size());
+    return result;
+}
+
 std::vector<std::uint8_t> makeTexturedMeshGlb(
         const std::string& additional_extension,
-        const std::string& sampler_fields_json) {
-    const std::vector<float> positions = {
+        const std::string& sampler_fields_json,
+        task::GltfUpAxis axis,
+        bool use_draco = false,
+        std::uint32_t declared_vertex_count = 3U,
+        std::uint32_t declared_index_count = 3U) {
+    const std::vector<float> z_up_positions = {
             -10.0F, -4.0F, 0.0F,
             10.0F, -4.0F, 0.0F,
             0.0F, 10.0F, 0.0F};
+    std::vector<float> positions;
+    positions.reserve(z_up_positions.size());
+    for (std::size_t offset = 0; offset < z_up_positions.size(); offset += 3U) {
+        const float x = z_up_positions[offset];
+        const float y = z_up_positions[offset + 1U];
+        const float z = z_up_positions[offset + 2U];
+        if (axis == task::GltfUpAxis::y) {
+            // Inverse of the production Y-up to Z-up transform.
+            positions.insert(positions.end(), {x, z, -y});
+        } else if (axis == task::GltfUpAxis::x) {
+            positions.insert(positions.end(), {z, y, -x});
+        } else {
+            positions.insert(positions.end(), {x, y, z});
+        }
+    }
     const std::vector<float> texture_coordinates = {
             0.0F, 0.0F,
             1.0F, 0.0F,
             0.5F, 1.0F};
     std::vector<std::uint8_t> binary;
-    appendFloats(binary, positions);
-    const std::size_t texture_coordinate_offset = binary.size();
-    appendFloats(binary, texture_coordinates);
+    std::optional<EncodedDracoMesh> draco_mesh;
+    std::size_t texture_coordinate_offset = 0U;
+    if (use_draco) {
+        draco_mesh = encodeDracoMesh(positions, texture_coordinates);
+        binary = draco_mesh->bytes;
+    } else {
+        appendFloats(binary, positions);
+        texture_coordinate_offset = binary.size();
+        appendFloats(binary, texture_coordinates);
+    }
     const std::size_t image_offset = binary.size();
     const auto image = encodeTexture();
     binary.insert(binary.end(), image.begin(), image.end());
@@ -201,6 +297,9 @@ std::vector<std::uint8_t> makeTexturedMeshGlb(
     pad(binary, clip_worker::formats::GlbParser::kChunkAlignment, 0U);
 
     Json extensions_used = Json::array({"KHR_materials_unlit", "EXT_texture_webp"});
+    if (use_draco) {
+        extensions_used.push_back("KHR_draco_mesh_compression");
+    }
     if (!additional_extension.empty()) {
         extensions_used.push_back(additional_extension);
     }
@@ -211,10 +310,19 @@ std::vector<std::uint8_t> makeTexturedMeshGlb(
             {{"nodes", Json::array({0U})}, {"name", "must-not-survive"}}});
     document["nodes"] = Json::array({
             {{"mesh", 0U}, {"name", "must-not-survive"}}});
+    Json primitive = {
+            {"attributes", {{"POSITION", 0U}, {"TEXCOORD_0", 1U}}},
+            {"material", 0U}, {"mode", kGlTriangles}};
+    if (use_draco) {
+        primitive["indices"] = 2U;
+        primitive["extensions"]["KHR_draco_mesh_compression"] = {
+                {"bufferView", 0U},
+                {"attributes",
+                 {{"POSITION", draco_mesh->position_unique_id},
+                  {"TEXCOORD_0", draco_mesh->texture_coordinate_unique_id}}}};
+    }
     document["meshes"] = Json::array({
-            {{"primitives", Json::array({
-                    {{"attributes", {{"POSITION", 0U}, {"TEXCOORD_0", 1U}}},
-                     {"material", 0U}, {"mode", kGlTriangles}}})}}});
+            {{"primitives", Json::array({std::move(primitive)})}}});
     document["materials"] = Json::array({{
             {"pbrMetallicRoughness",
              {{"baseColorTexture", {{"index", 0U}}}}},
@@ -234,25 +342,45 @@ std::vector<std::uint8_t> makeTexturedMeshGlb(
         }
     }
     document["samplers"] = Json::array({std::move(sampler)});
-    document["images"] = Json::array({
-            {{"bufferView", 2U}, {"mimeType", "image/webp"}}});
-    document["bufferViews"] = Json::array({
-            {{"buffer", 0U}, {"byteOffset", 0U},
-             {"byteLength", positions.size() * sizeof(float)},
-             {"target", kGlArrayBuffer}},
-            {{"buffer", 0U}, {"byteOffset", texture_coordinate_offset},
-             {"byteLength", texture_coordinates.size() * sizeof(float)},
-             {"target", kGlArrayBuffer}},
-            {{"buffer", 0U}, {"byteOffset", image_offset},
-             {"byteLength", image.size()}}});
-    document["accessors"] = Json::array({
-            {{"bufferView", 0U}, {"componentType", kGlFloat},
-             {"count", 3U}, {"type", "VEC3"}},
-            {{"bufferView", 1U}, {"componentType", kGlFloat},
-             {"count", 3U}, {"type", "VEC2"}}});
+    if (use_draco) {
+        document["images"] = Json::array({
+                {{"bufferView", 1U}, {"mimeType", "image/webp"}}});
+        document["bufferViews"] = Json::array({
+                {{"buffer", 0U}, {"byteOffset", 0U},
+                 {"byteLength", draco_mesh->bytes.size()}},
+                {{"buffer", 0U}, {"byteOffset", image_offset},
+                 {"byteLength", image.size()}}});
+        document["accessors"] = Json::array({
+                {{"componentType", kGlFloat},
+                 {"count", declared_vertex_count}, {"type", "VEC3"}},
+                {{"componentType", kGlFloat},
+                 {"count", declared_vertex_count}, {"type", "VEC2"}},
+                {{"componentType", kGlUnsignedInt},
+                 {"count", declared_index_count}, {"type", "SCALAR"}}});
+    } else {
+        document["images"] = Json::array({
+                {{"bufferView", 2U}, {"mimeType", "image/webp"}}});
+        document["bufferViews"] = Json::array({
+                {{"buffer", 0U}, {"byteOffset", 0U},
+                 {"byteLength", positions.size() * sizeof(float)},
+                 {"target", kGlArrayBuffer}},
+                {{"buffer", 0U}, {"byteOffset", texture_coordinate_offset},
+                 {"byteLength", texture_coordinates.size() * sizeof(float)},
+                 {"target", kGlArrayBuffer}},
+                {{"buffer", 0U}, {"byteOffset", image_offset},
+                 {"byteLength", image.size()}}});
+        document["accessors"] = Json::array({
+                {{"bufferView", 0U}, {"componentType", kGlFloat},
+                 {"count", 3U}, {"type", "VEC3"}},
+                {{"bufferView", 1U}, {"componentType", kGlFloat},
+                 {"count", 3U}, {"type", "VEC2"}}});
+    }
     document["buffers"] = Json::array({{{"byteLength", buffer_length}}});
     document["extensionsUsed"] = std::move(extensions_used);
     document["extensionsRequired"] = Json::array({"EXT_texture_webp"});
+    if (use_draco) {
+        document["extensionsRequired"].push_back("KHR_draco_mesh_compression");
+    }
 
     std::string json_text = document.dump();
     while (json_text.size() % clip_worker::formats::GlbParser::kChunkAlignment != 0U) {
@@ -304,17 +432,40 @@ std::vector<std::uint8_t> makeCompatibleMisalignedB3dm() {
 
 TexturedMeshFixture makeTexturedMeshFixture(
         const std::string& additional_extension, bool include_rtc_center,
-        const std::string& sampler_fields_json) {
+        const std::string& sampler_fields_json, task::GltfUpAxis axis) {
     TexturedMeshFixture fixture;
     const std::string feature_table = include_rtc_center
             ? R"({"BATCH_LENGTH":1,"RTC_CENTER":[0,0,0]})"
             : R"({"BATCH_LENGTH":1})";
     fixture.b3dm = makeB3dm(
-            makeTexturedMeshGlb(additional_extension, sampler_fields_json), feature_table,
+            makeTexturedMeshGlb(additional_extension, sampler_fields_json, axis), feature_table,
             R"({"name":["synthetic-feature"]})");
     fixture.task.scope_wkb_base64 = base64Encode(squareScopeWkb());
     fixture.task.scope_srid = 4490;
     fixture.task.world_transform = localEnuTransform();
+    fixture.task.gltf_up_axis = axis;
+    return fixture;
+}
+
+TexturedMeshFixture makeDracoTexturedMeshFixture(
+        std::uint32_t batch_length, std::uint32_t declared_vertex_count,
+        std::uint32_t declared_index_count) {
+    if (batch_length > 1U) {
+        throw std::invalid_argument("Synthetic Draco fixture supports batch length zero or one");
+    }
+    TexturedMeshFixture fixture;
+    const std::string feature_table =
+            std::string(R"({"BATCH_LENGTH":)") + std::to_string(batch_length) + "}";
+    const std::string batch_table = batch_length == 1U
+            ? R"({"name":["synthetic-feature"]})" : std::string();
+    fixture.b3dm = makeB3dm(
+            makeTexturedMeshGlb("", "", task::GltfUpAxis::z, true,
+                                declared_vertex_count, declared_index_count),
+            feature_table, batch_table);
+    fixture.task.scope_wkb_base64 = base64Encode(squareScopeWkb());
+    fixture.task.scope_srid = 4490;
+    fixture.task.world_transform = localEnuTransform();
+    fixture.task.gltf_up_axis = task::GltfUpAxis::z;
     return fixture;
 }
 

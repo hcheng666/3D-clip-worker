@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(three_d_tiles_clip_worker VERSION 0.1.3 LANGUAGES CXX)
+project(three_d_tiles_clip_worker VERSION 0.1.7 LANGUAGES CXX)
 
 option(CLIP_WORKER_BUILD_TESTS "Build unit tests" ON)
 
@@ -14,6 +14,7 @@ find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
 find_package(PROJ CONFIG REQUIRED)
 find_package(WebP CONFIG REQUIRED)
+find_package(draco CONFIG REQUIRED)
 find_path(MAPBOX_EARCUT_INCLUDE_DIR mapbox/earcut.hpp REQUIRED)
 
 add_library(clip_worker_core
@@ -22,6 +23,7 @@ add_library(clip_worker_core
     src/client/worker_api_client.cpp
     src/client/object_transfer.cpp
     src/formats/b3dm/b3dm_parser.cpp
+    src/formats/gltf/draco_decoder.cpp
     src/formats/gltf/glb_parser.cpp
     src/geometry/triangle_clipper.cpp
     src/geometry/authorization_scope.cpp
@@ -48,6 +50,7 @@ target_link_libraries(clip_worker_core
         PROJ::proj
         WebP::webp
         WebP::sharpyuv
+        draco::draco
 )
 
 if(MSVC)

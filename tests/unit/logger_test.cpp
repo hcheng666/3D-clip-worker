@@ -194,5 +194,53 @@ TEST(LoggerTest, OmitsSamplerWarningWhenNoWrapRWasObserved) {
     EXPECT_TRUE(output.str().empty());
 }
 
+TEST(LoggerTest, WritesOneRedactedDracoAccessorCompatibilityWarning) {
+    std::ostringstream output;
+    const Logger logger(LogLevel::info, output);
+    clip::DracoCompatibilityDiagnostics diagnostics;
+    diagnostics.affected_primitive_count = 1U;
+    diagnostics.affected_accessor_count = 2U;
+    diagnostics.affected_index_count = 1U;
+    diagnostics.maximum_declared_vertex_count = 5996U;
+    diagnostics.maximum_decoded_point_count = 6251U;
+    diagnostics.maximum_declared_index_count = 12606U;
+    diagnostics.maximum_decoded_index_count = 12603U;
+
+    task::logDracoCompatibilityWarning(
+            logger, "worker-1", "asset-1", diagnostics);
+
+    std::istringstream lines(output.str());
+    std::string line;
+    ASSERT_TRUE(static_cast<bool>(std::getline(lines, line)));
+    const auto json = nlohmann::json::parse(line);
+    EXPECT_EQ(json.at("level"), "WARN");
+    EXPECT_EQ(json.at("event"), "source.compatibility_warning");
+    EXPECT_EQ(json.at("compatibilityCode"),
+              "GLTF_STALE_DRACO_ACCESSOR_COUNT");
+    EXPECT_EQ(json.at("affectedPrimitiveCount"), 1U);
+    EXPECT_EQ(json.at("affectedAccessorCount"), 2U);
+    EXPECT_EQ(json.at("affectedIndexCount"), 1U);
+    EXPECT_EQ(json.at("maximumDeclaredVertexCount"), 5996U);
+    EXPECT_EQ(json.at("maximumDecodedPointCount"), 6251U);
+    EXPECT_EQ(json.at("maximumDeclaredIndexCount"), 12606U);
+    EXPECT_EQ(json.at("maximumDecodedIndexCount"), 12603U);
+    EXPECT_FALSE(json.contains("sourceDownloadUrl"));
+    EXPECT_FALSE(json.contains("leaseToken"));
+    EXPECT_FALSE(json.contains("sourceEtag"));
+    EXPECT_FALSE(json.contains("scopeWkbBase64"));
+    std::string extra_line;
+    EXPECT_FALSE(static_cast<bool>(std::getline(lines, extra_line)));
+}
+
+TEST(LoggerTest, OmitsDracoWarningWhenCountsMatch) {
+    std::ostringstream output;
+    const Logger logger(LogLevel::debug, output);
+
+    task::logDracoCompatibilityWarning(
+            logger, "worker-1", "asset-1", {});
+
+    EXPECT_TRUE(output.str().empty());
+}
+
 }  // namespace
 }  // namespace clip_worker::logging

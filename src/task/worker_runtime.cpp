@@ -41,6 +41,8 @@ constexpr const char* kB3dmNonconformantAlignmentCode =
         "B3DM_NONCONFORMANT_ALIGNMENT";
 constexpr const char* kGltfNonstandardSamplerWrapRCode =
         "GLTF_NONSTANDARD_SAMPLER_WRAP_R";
+constexpr const char* kGltfStaleDracoAccessorCountCode =
+        "GLTF_STALE_DRACO_ACCESSOR_COUNT";
 
 using SteadyClock = std::chrono::steady_clock;
 
@@ -300,6 +302,35 @@ void logSamplerCompatibilityWarning(
     }
 }
 
+void logDracoCompatibilityWarning(
+        const logging::Logger& logger, const std::string& worker_id,
+        const std::string& asset_id,
+        const clip::DracoCompatibilityDiagnostics& diagnostics) noexcept {
+    try {
+        if (!diagnostics.requiresCompatibility()) {
+            return;
+        }
+        auto fields = taskFields(worker_id, asset_id);
+        fields["compatibilityCode"] = kGltfStaleDracoAccessorCountCode;
+        fields["affectedPrimitiveCount"] = diagnostics.affected_primitive_count;
+        fields["affectedAccessorCount"] = diagnostics.affected_accessor_count;
+        fields["affectedIndexCount"] = diagnostics.affected_index_count;
+        fields["maximumDeclaredVertexCount"] =
+                diagnostics.maximum_declared_vertex_count;
+        fields["maximumDecodedPointCount"] =
+                diagnostics.maximum_decoded_point_count;
+        fields["maximumDeclaredIndexCount"] =
+                diagnostics.maximum_declared_index_count;
+        fields["maximumDecodedIndexCount"] =
+                diagnostics.maximum_decoded_index_count;
+        logger.warning(kEventSourceCompatibilityWarning,
+                       "Accepted stale glTF accessor counts for decoded Draco geometry",
+                       fields);
+    } catch (...) {
+        // Diagnostic logging must never change the task outcome.
+    }
+}
+
 WorkerRuntime::WorkerRuntime(WorkerRuntimeConfig config,
                              client::WorkerApiClient api_client,
                              client::ObjectTransfer object_transfer,
@@ -412,6 +443,11 @@ void WorkerRuntime::process(const ClaimTask& task) const {
                 [this, &task](
                         const clip::SamplerCompatibilityDiagnostics& diagnostics) {
                     logSamplerCompatibilityWarning(
+                            logger_, config_.worker_id, task.asset_id, diagnostics);
+                },
+                [this, &task](
+                        const clip::DracoCompatibilityDiagnostics& diagnostics) {
+                    logDracoCompatibilityWarning(
                             logger_, config_.worker_id, task.asset_id, diagnostics);
                 });
         clipped.statistics.cost_ms = elapsedMilliseconds(started);

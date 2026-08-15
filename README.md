@@ -8,7 +8,7 @@
 作为已授权结果透传。生产目标平台为 Linux `amd64` 和 Linux `arm64`；Windows 仅作为开发构建
 环境。不支持 ARMv7 和其他 32 位 ARM 平台。
 
-当前程序版本为 `0.1.3`，默认裁切算法版本为 `v4`。
+当前程序版本为 `0.1.7`，默认裁切算法版本为 `v8`。
 
 ## 功能范围
 
@@ -28,14 +28,14 @@
 
 ### 当前输入限制
 
-- 任务内容格式必须为受支持的 B3DM + glTF 2.0，且 `gltfUpAxis` 必须显式为 `Z`；
-- 仅支持未压缩的 `TRIANGLES` Primitive 和内嵌 Buffer；
-- B3DM 仅支持 `BATCH_LENGTH=1`，不支持额外的二进制 Feature/Batch Table 语义；
+- 任务内容格式必须为受支持的 B3DM + glTF 2.0，且任务 `gltfUpAxis` 必须是控制面已验证的 `Y` 或 `Z`；`X` 可识别但尚未启用；
+- 支持未压缩或 `KHR_draco_mesh_compression` 压缩的 `TRIANGLES` Primitive 和内嵌 Buffer；
+- B3DM 支持 `BATCH_LENGTH=0/1`，不支持额外的二进制 Feature/Batch Table 语义；
 - 纹理裁切使用 `TEXCOORD_0` 和内嵌 WebP；
 - 已知 WebGL 枚举值的非标准 `sampler.wrapR` 会被校验、记录兼容性告警并从输出移除；
 - `wrapS`、`wrapT` 仍按二维纹理 Mask 的受支持模式严格校验。
 
-Draco、Meshopt、KTX2/BasisU、外部 glTF 资源、未知必需扩展及其他未明确支持的内容均会
+Meshopt、KTX2/BasisU、外部 glTF 资源、未知必需扩展及其他未明确支持的内容均会
 fail closed，不会生成 `READY` 结果。
 
 ## 处理流程
@@ -86,7 +86,7 @@ Worker 自身不监听端口，仅主动访问元数据控制面和控制面下�
 - 支持 C++17 的编译器；
 - vcpkg，并设置环境变量 `VCPKG_ROOT`。
 
-项目依赖由 `vcpkg.json` 声明，包括 libcurl、nlohmann/json、OpenSSL、PROJ、libwebp、
+项目依赖由 `vcpkg.json` 声明，包括 libcurl、nlohmann/json、OpenSSL、PROJ、libwebp、Draco、
 earcut.hpp 和 GoogleTest。
 
 ### 编译与测试
@@ -151,7 +151,7 @@ Windows Debug 构建示例：
 | `CLIP_WORKER_CONTROL_PLANE_URL` | 是 | 无 | 元数据控制面基础 URL，必须能从 Worker 容器访问 |
 | `CLIP_WORKER_ID` | 否 | `HOSTNAME`/`COMPUTERNAME` | Worker 唯一标识；Compose 扩容时建议留空 |
 | `CLIP_WORKER_AUTHORIZATION_HEADER` | 否 | 空 | 完整 HTTP Header，例如 `Authorization: Bearer ...` |
-| `CLIP_WORKER_ALGORITHM_VERSION` | 否 | `v4` | 必须与控制面的裁切算法版本一致 |
+| `CLIP_WORKER_ALGORITHM_VERSION` | 否 | `v8` | 必须与控制面的裁切算法版本一致 |
 | `CLIP_WORKER_MAX_INPUT_BYTES` | 否 | `67108864` | 单个输入对象最大字节数，必须为正整数 |
 | `CLIP_WORKER_MAX_OUTPUT_BYTES` | 否 | `67108864` | 单个输出对象最大字节数，必须为正整数 |
 | `CLIP_WORKER_POLL_INTERVAL_SECONDS` | 否 | `5` | 空任务或领取失败后的轮询间隔，单位为秒 |
@@ -170,7 +170,7 @@ README、日志或提交到版本库。
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `COMPOSE_PROJECT_NAME` | `three-d-tiles-clip-worker` | Compose 项目名 |
-| `CLIP_WORKER_IMAGE` | `3d-tiles-clip-worker:0.1.3` | 构建或部署的 Worker 镜像 |
+| `CLIP_WORKER_IMAGE` | `3d-tiles-clip-worker:0.1.7` | 构建或部署的 Worker 镜像 |
 | `CLIP_WORKER_STOP_GRACE_PERIOD` | `10m` | 收到 `SIGTERM` 后允许在途任务完成的时间 |
 | `CLIP_WORKER_LOG_MAX_SIZE` | `10m` | 单个 Docker 日志文件大小上限 |
 | `CLIP_WORKER_LOG_MAX_FILES` | `5` | Docker 日志文件保留数量 |
@@ -181,7 +181,7 @@ README、日志或提交到版本库。
 | `CLIP_WORKER_VCPKG_ASSET_PREFIX` | `https://github.com` | vcpkg tool 下载前缀 |
 | `CLIP_WORKER_VCPKG_GITHUB_ASSET_PREFIX` | 空 | GitHub 依赖资产代理前缀 |
 | `CLIP_WORKER_VCPKG_SQLITE_MIRROR_PREFIX` | 空 | SQLite 依赖资产镜像前缀 |
-| `CLIP_WORKER_DEPS_VERSION` | `ubuntu24.04-vcpkg2025.07.25-r1` | 离线依赖版本 |
+| `CLIP_WORKER_DEPS_VERSION` | `ubuntu24.04-vcpkg2025.07.25-r2` | 离线依赖版本 |
 | `CLIP_WORKER_BUILD_BASE_IMAGE` | 带版本和架构的本地镜像 | 离线编译基础镜像 |
 | `CLIP_WORKER_RUNTIME_BASE_IMAGE` | 带版本和架构的本地镜像 | 离线运行基础镜像 |
 
@@ -312,7 +312,7 @@ docker compose up --detach --no-build --scale clip-worker=1
 ```
 
 副本回滚不需要重置任务或 `READY` 资产。控制面和全部运行中的 Worker 必须使用相同算法版本，
-当前为 `v4`。
+当前为 `v8`。该版本按任务轴向在投影链路中应用 Y-up/Z-up 变换，支持受限的 Draco 输入，并兼容带结构化告警的遗留属性/索引 accessor count。
 
 ## 离线构建与交付
 
@@ -369,7 +369,7 @@ profile，便于替换为批准的内部 Registry 或代理。镜像地址和构
 
 ```sh
 ./docker/offline/load-bundle.sh /media/offline/clip-worker-deps
-./docker/offline/build.sh 3d-tiles-clip-worker:0.1.3
+./docker/offline/build.sh 3d-tiles-clip-worker:0.1.7
 ```
 
 `load-bundle.sh` 在导入前校验 `SHA256SUMS`、bundle manifest、宿主架构、镜像 ID/标签及当前

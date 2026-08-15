@@ -27,6 +27,21 @@ struct SamplerCompatibilityDiagnostics {
     }
 };
 
+/** Aggregated diagnostics for accepted stale Draco accessor counts. */
+struct DracoCompatibilityDiagnostics {
+    std::size_t affected_primitive_count = 0U;
+    std::size_t affected_accessor_count = 0U;
+    std::size_t affected_index_count = 0U;
+    std::size_t maximum_declared_vertex_count = 0U;
+    std::size_t maximum_decoded_point_count = 0U;
+    std::size_t maximum_declared_index_count = 0U;
+    std::size_t maximum_decoded_index_count = 0U;
+
+    [[nodiscard]] bool requiresCompatibility() const noexcept {
+        return affected_primitive_count > 0U;
+    }
+};
+
 /** 当前一期格式范围内的严格B3DM/GLB Mesh与WebP裁切重建器。 */
 class B3dmClipper final {
 public:
@@ -34,13 +49,16 @@ public:
             const formats::B3dmLayoutDiagnostics&)>;
     using SamplerCompatibilityObserver = std::function<void(
             const SamplerCompatibilityDiagnostics&)>;
+    using DracoCompatibilityObserver = std::function<void(
+            const DracoCompatibilityDiagnostics&)>;
 
     /** The observer runs after source parsing and before semantic/geometry validation. */
     [[nodiscard]] static B3dmClipResult clip(
             const std::vector<std::uint8_t>& source,
             const task::ClaimTask& task,
             const SourceLayoutObserver& source_layout_observer = {},
-            const SamplerCompatibilityObserver& sampler_compatibility_observer = {});
+            const SamplerCompatibilityObserver& sampler_compatibility_observer = {},
+            const DracoCompatibilityObserver& draco_compatibility_observer = {});
 };
 
 }  // namespace clip_worker::clip

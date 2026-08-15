@@ -21,6 +21,11 @@ namespace {
 
 using Json = nlohmann::json;
 
+constexpr std::size_t kB3dmByteLengthOffset = 8U;
+constexpr std::size_t kFeatureTableBinaryLengthOffset = 16U;
+constexpr std::size_t kBatchTableBinaryLengthOffset = 24U;
+constexpr std::size_t kSyntheticBinaryTableLength = 8U;
+
 struct ParsedOutput {
     formats::B3dmDocument document;
     Json json;
@@ -34,6 +39,20 @@ ParsedOutput parseOutput(const std::vector<std::uint8_t>& bytes) {
     result.binary = bytes.data() + result.document.glb_section.offset
                     + result.document.glb.binary_offset;
     return result;
+}
+
+std::vector<std::uint8_t> makeB3dmWithBinaryTable(
+        std::size_t binary_length_header_offset) {
+    auto bytes = tests::makeMinimalB3dm();
+    const auto document = formats::B3dmParser::parse(formats::ByteView(bytes));
+    bytes.insert(bytes.begin()
+                         + static_cast<std::ptrdiff_t>(document.glb_section.offset),
+                 kSyntheticBinaryTableLength, 0U);
+    tests::writeUint32(bytes, binary_length_header_offset,
+                       static_cast<std::uint32_t>(kSyntheticBinaryTableLength));
+    tests::writeUint32(bytes, kB3dmByteLengthOffset,
+                       static_cast<std::uint32_t>(bytes.size()));
+    return bytes;
 }
 
 std::vector<float> positionValues(const ParsedOutput& output) {
@@ -138,7 +157,7 @@ TEST(B3dmClipperTest, NormalizesCompatibleSourceToEightByteAlignedOutput) {
     EXPECT_EQ(output.glb_section.byte_length, output.glb.header.byte_length);
 }
 
-TEST(B3dmClipperTest, ProducesDeterministicBytesForRepeatedV4Input) {
+TEST(B3dmClipperTest, ProducesDeterministicBytesForRepeatedV8Input) {
     const auto fixture = tests::makeTexturedMeshFixture();
 
     const B3dmClipResult first = B3dmClipper::clip(fixture.b3dm, fixture.task);
@@ -150,6 +169,155 @@ TEST(B3dmClipperTest, ProducesDeterministicBytesForRepeatedV4Input) {
               second.statistics.triangle_count_after);
     EXPECT_EQ(first.statistics.texture_bytes_after,
               second.statistics.texture_bytes_after);
+}
+
+TEST(B3dmClipperTest, ClipsDracoAndWritesUncompressedZeroAndSingleBatchOutput) {
+    for (const std::uint32_t batch_length : {0U, 1U}) {
+        const auto fixture = tests::makeDracoTexturedMeshFixture(batch_length);
+
+        const B3dmClipResult clipped = B3dmClipper::clip(fixture.b3dm, fixture.task);
+
+        ASSERT_FALSE(clipped.empty);
+        EXPECT_EQ(clipped.statistics.vertex_count_before, 3U);
+        EXPECT_EQ(clipped.statistics.triangle_count_before, 1U);
+        const ParsedOutput output = parseOutput(clipped.bytes);
+        EXPECT_EQ(output.document.batch_length, batch_length);
+        const auto& primitive = output.json.at("meshes").at(0U)
+                .at("primitives").at(0U);
+        EXPECT_FALSE(primitive.contains("extensions"));
+        for (const auto& accessor : output.json.at("accessors")) {
+            EXPECT_TRUE(accessor.contains("bufferView"));
+        }
+        if (output.json.contains("extensionsUsed")) {
+            EXPECT_EQ(std::find(output.json.at("extensionsUsed").begin(),
+                                output.json.at("extensionsUsed").end(),
+                                "KHR_draco_mesh_compression"),
+                      output.json.at("extensionsUsed").end());
+        }
+        if (batch_length == 0U) {
+            EXPECT_TRUE(output.document.batch_table_json_text.empty());
+        } else {
+            EXPECT_EQ(Json::parse(output.document.batch_table_json_text).at("name"),
+                      Json::array({"synthetic-feature"}));
+        }
+    }
+}
+
+TEST(B3dmClipperTest, AcceptsStaleDracoAccessorCountsAndReportsCompatibility) {
+    constexpr std::uint32_t stale_vertex_count = 2U;
+    constexpr std::uint32_t stale_index_count = 6U;
+    const auto fixture = tests::makeDracoTexturedMeshFixture(
+            1U, stale_vertex_count, stale_index_count);
+    DracoCompatibilityDiagnostics diagnostics;
+
+    const B3dmClipResult clipped = B3dmClipper::clip(
+            fixture.b3dm, fixture.task, {}, {},
+            [&diagnostics](const DracoCompatibilityDiagnostics& observed) {
+                diagnostics = observed;
+            });
+
+    EXPECT_FALSE(clipped.empty);
+    EXPECT_EQ(diagnostics.affected_primitive_count, 1U);
+    EXPECT_EQ(diagnostics.affected_accessor_count, 2U);
+    EXPECT_EQ(diagnostics.affected_index_count, 1U);
+    EXPECT_EQ(diagnostics.maximum_declared_vertex_count, stale_vertex_count);
+    EXPECT_EQ(diagnostics.maximum_decoded_point_count, 3U);
+    EXPECT_EQ(diagnostics.maximum_declared_index_count, stale_index_count);
+    EXPECT_EQ(diagnostics.maximum_decoded_index_count, 3U);
+}
+
+TEST(B3dmClipperTest, RejectsMalformedDracoPayloadWithAccessorDiagnostic) {
+    auto fixture = tests::makeDracoTexturedMeshFixture();
+    const auto input = parseOutput(fixture.b3dm);
+    const auto& compressed_view = input.json.at("bufferViews").at(0U);
+    const std::size_t compressed_offset = input.document.glb_section.offset
+            + input.document.glb.binary_offset
+            + compressed_view.value("byteOffset", 0U);
+    const std::size_t compressed_length =
+            compressed_view.at("byteLength").get<std::size_t>();
+    ASSERT_GE(compressed_length, 8U);
+    std::fill_n(fixture.b3dm.begin()
+                        + static_cast<std::ptrdiff_t>(compressed_offset),
+                8U, 0U);
+
+    try {
+        static_cast<void>(B3dmClipper::clip(fixture.b3dm, fixture.task));
+        FAIL() << "Expected FormatError";
+    } catch (const formats::FormatError& error) {
+        EXPECT_EQ(error.code(), formats::FormatErrorCode::invalid_accessor);
+        EXPECT_NE(std::string(error.what()).find("Draco"), std::string::npos);
+    }
+}
+
+TEST(B3dmClipperTest, RejectsMoreThanOneBatch) {
+    const auto source = tests::makeMinimalB3dm(R"({"BATCH_LENGTH":2})");
+    task::ClaimTask task;
+
+    try {
+        static_cast<void>(B3dmClipper::clip(source, task));
+        FAIL() << "Expected FormatError";
+    } catch (const formats::FormatError& error) {
+        EXPECT_EQ(error.code(), formats::FormatErrorCode::unsupported_content);
+        EXPECT_NE(std::string(error.what()).find("BATCH_LENGTH"), std::string::npos);
+    }
+}
+
+TEST(B3dmClipperTest, DistinguishesUnsupportedFeatureTableBinary) {
+    const auto source = makeB3dmWithBinaryTable(
+            kFeatureTableBinaryLengthOffset);
+
+    try {
+        static_cast<void>(B3dmClipper::clip(source, {}));
+        FAIL() << "Expected FormatError";
+    } catch (const formats::FormatError& error) {
+        EXPECT_EQ(error.code(), formats::FormatErrorCode::unsupported_content);
+        EXPECT_NE(std::string(error.what()).find("Feature Table Binary"),
+                  std::string::npos);
+    }
+}
+
+TEST(B3dmClipperTest, DistinguishesUnsupportedBatchTableBinary) {
+    const auto source = makeB3dmWithBinaryTable(
+            kBatchTableBinaryLengthOffset);
+
+    try {
+        static_cast<void>(B3dmClipper::clip(source, {}));
+        FAIL() << "Expected FormatError";
+    } catch (const formats::FormatError& error) {
+        EXPECT_EQ(error.code(), formats::FormatErrorCode::unsupported_content);
+        EXPECT_NE(std::string(error.what()).find("Batch Table Binary"),
+                  std::string::npos);
+    }
+}
+
+TEST(B3dmClipperTest, ClipsEquivalentYAndZUpWorldGeometry) {
+    const auto z_fixture = tests::makeTexturedMeshFixture(
+            "", false, "", task::GltfUpAxis::z);
+    const auto y_fixture = tests::makeTexturedMeshFixture(
+            "", false, "", task::GltfUpAxis::y);
+
+    const auto z_clipped = B3dmClipper::clip(z_fixture.b3dm, z_fixture.task);
+    const auto y_clipped = B3dmClipper::clip(y_fixture.b3dm, y_fixture.task);
+
+    ASSERT_FALSE(z_clipped.empty);
+    ASSERT_FALSE(y_clipped.empty);
+    EXPECT_EQ(y_clipped.statistics.vertex_count_after,
+              z_clipped.statistics.vertex_count_after);
+    EXPECT_EQ(y_clipped.statistics.triangle_count_after,
+              z_clipped.statistics.triangle_count_after);
+    const ParsedOutput y_output = parseOutput(y_clipped.bytes);
+    const ParsedOutput z_output = parseOutput(z_clipped.bytes);
+    EXPECT_EQ(imageBytes(y_output), imageBytes(z_output));
+
+    const auto y_positions = positionValues(y_output);
+    const auto z_positions = positionValues(z_output);
+    ASSERT_EQ(y_positions.size(), z_positions.size());
+    for (std::size_t offset = 0U; offset < y_positions.size(); offset += 3U) {
+        // Output remains in each source's local axis while representing equal world geometry.
+        EXPECT_NEAR(y_positions[offset], z_positions[offset], 1.0e-5F);
+        EXPECT_NEAR(y_positions[offset + 1U], z_positions[offset + 2U], 1.0e-5F);
+        EXPECT_NEAR(y_positions[offset + 2U], -z_positions[offset + 1U], 1.0e-5F);
+    }
 }
 
 TEST(B3dmClipperTest, RejectsUnknownDeclaredExtension) {

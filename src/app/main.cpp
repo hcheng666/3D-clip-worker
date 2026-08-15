@@ -27,7 +27,7 @@ namespace {
 
 constexpr std::uintmax_t kMebibyte = 1024U * 1024U;
 constexpr std::uintmax_t kMaxInspectInputBytes = 512U * kMebibyte;
-constexpr const char* kVersion = "0.1.3";
+constexpr const char* kVersion = "0.1.7";
 constexpr const char* kControlPlaneUrlVariable = "CLIP_WORKER_CONTROL_PLANE_URL";
 constexpr const char* kWorkerIdVariable = "CLIP_WORKER_ID";
 constexpr const char* kHostnameVariable = "HOSTNAME";

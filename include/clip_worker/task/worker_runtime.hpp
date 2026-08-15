@@ -25,8 +25,14 @@ void logSamplerCompatibilityWarning(
         const std::string& asset_id,
         const clip::SamplerCompatibilityDiagnostics& diagnostics) noexcept;
 
+/** Emits one redacted warning for accepted stale Draco accessor counts. */
+void logDracoCompatibilityWarning(
+        const logging::Logger& logger, const std::string& worker_id,
+        const std::string& asset_id,
+        const clip::DracoCompatibilityDiagnostics& diagnostics) noexcept;
+
 struct WorkerRuntimeConfig {
-    static constexpr const char* kDefaultAlgorithmVersion = "v4";
+    static constexpr const char* kDefaultAlgorithmVersion = "v8";
     static constexpr std::uint64_t kDefaultMaximumInputBytes = 64U * 1024U * 1024U;
     static constexpr std::uint64_t kDefaultMaximumOutputBytes = 64U * 1024U * 1024U;
     static constexpr long kDefaultPollIntervalSeconds = 5;

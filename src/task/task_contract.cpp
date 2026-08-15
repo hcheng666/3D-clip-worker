@@ -9,6 +9,8 @@ namespace clip_worker::task {
 namespace {
 
 constexpr const char* kB3dmGltf2 = "B3DM_GLTF2";
+constexpr const char* kGltfUpAxisX = "X";
+constexpr const char* kGltfUpAxisY = "Y";
 constexpr const char* kGltfUpAxisZ = "Z";
 constexpr const char* kCompletionReady = "READY";
 constexpr const char* kCompletionEmpty = "EMPTY";
@@ -58,6 +60,10 @@ ContentFormat parseContentFormat(const std::string& value) {
 
 std::string gltfUpAxisName(GltfUpAxis value) {
     switch (value) {
+        case GltfUpAxis::x:
+            return kGltfUpAxisX;
+        case GltfUpAxis::y:
+            return kGltfUpAxisY;
         case GltfUpAxis::z:
             return kGltfUpAxisZ;
     }
@@ -65,8 +71,15 @@ std::string gltfUpAxisName(GltfUpAxis value) {
 }
 
 GltfUpAxis parseGltfUpAxis(const std::string& value) {
+    if (value == kGltfUpAxisY) {
+        return GltfUpAxis::y;
+    }
     if (value == kGltfUpAxisZ) {
         return GltfUpAxis::z;
+    }
+    if (value == kGltfUpAxisX) {
+        throw std::invalid_argument(
+                "Task glTF X-up is recognized but not production enabled");
     }
     throw std::invalid_argument("Unsupported task glTF up axis: " + value);
 }

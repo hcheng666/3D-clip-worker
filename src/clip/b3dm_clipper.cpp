@@ -2,6 +2,7 @@
 
 #include "clip_worker/formats/b3dm.hpp"
 #include "clip_worker/formats/byte_view.hpp"
+#include "clip_worker/formats/draco_decoder.hpp"
 #include "clip_worker/formats/format_error.hpp"
 #include "clip_worker/geometry/authorization_scope.hpp"
 #include "clip_worker/geometry/clip_geometry.hpp"
@@ -54,6 +55,7 @@ constexpr std::size_t kMaximumUvRepeatSpan = 128U;
 constexpr double kUvMaskTolerancePixels = 1.0;
 constexpr const char* kUnlitExtension = "KHR_materials_unlit";
 constexpr const char* kWebpExtension = "EXT_texture_webp";
+constexpr const char* kDracoExtension = "KHR_draco_mesh_compression";
 constexpr const char* kSamplerWrapRField = "wrapR";
 
 [[noreturn]] void unsupported(const std::string& message) {
@@ -121,7 +123,8 @@ bool extensionArrayContains(const Json& document, const char* field,
             unsupported(std::string("glTF ") + field + " contains a non-string");
         }
         const std::string name = value.get<std::string>();
-        if (name != kUnlitExtension && name != kWebpExtension) {
+        if (name != kUnlitExtension && name != kWebpExtension
+            && name != kDracoExtension) {
             unsupported(std::string("glTF declares an unsupported extension: ") + name);
         }
         found = found || name == extension;
@@ -245,6 +248,32 @@ public:
         return std::vector<std::uint8_t>(binary_ + offset, binary_ + offset + length);
     }
 
+    std::size_t validateDracoFloatAccessor(
+            std::size_t accessor_index, std::size_t components,
+            const char* expected_type) const {
+        return validateDracoAccessor(accessor_index, components, expected_type,
+                                     kComponentFloat, false);
+    }
+
+    std::size_t validateDracoUnsignedScalarAccessor(
+            std::size_t accessor_index) const {
+        const auto& accessor = indexed(requiredArray("accessors"), accessor_index,
+                                       "accessor");
+        if (!accessor.contains("componentType")
+            || !accessor.at("componentType").is_number_unsigned()) {
+            invalidAccessor("Draco accessor componentType is missing");
+        }
+        const std::uint32_t component_type =
+                accessor.at("componentType").get<std::uint32_t>();
+        if (component_type != kComponentUnsignedByte
+            && component_type != kComponentUnsignedShort
+            && component_type != kComponentUnsignedInt) {
+            invalidAccessor("Draco scalar accessor uses an unsupported componentType");
+        }
+        return validateDracoAccessor(accessor_index, 1U, "SCALAR",
+                                     component_type, true);
+    }
+
 private:
     struct AccessorRange { const std::uint8_t* data; std::size_t count; std::size_t stride; };
 
@@ -288,6 +317,35 @@ private:
         }
         requireBinaryRange(view_offset + accessor_offset, required_length);
         return {binary_ + view_offset + accessor_offset, count, stride};
+    }
+
+    std::size_t validateDracoAccessor(
+            std::size_t accessor_index, std::size_t components,
+            const char* expected_type, std::uint32_t expected_component_type,
+            bool allow_unsigned_component_type) const {
+        const auto& accessor = indexed(requiredArray("accessors"), accessor_index,
+                                       "accessor");
+        if (accessor.contains("sparse") || accessor.value("normalized", false)) {
+            unsupported("Sparse or normalized Draco accessors are not supported");
+        }
+        const std::uint32_t component_type = accessor.value("componentType", 0U);
+        const bool component_matches = allow_unsigned_component_type
+                ? component_type == kComponentUnsignedByte
+                  || component_type == kComponentUnsignedShort
+                  || component_type == kComponentUnsignedInt
+                : component_type == expected_component_type;
+        if (accessor.value("type", std::string()) != expected_type
+            || !component_matches) {
+            invalidAccessor("Draco accessor type or componentType does not match its semantic");
+        }
+        const std::size_t count = checkedSize(accessor, "count");
+        if (count == 0U || count > kMaximumAccessorElements) {
+            invalidAccessor("Draco accessor count is outside the supported range");
+        }
+        if (components > std::numeric_limits<std::size_t>::max() / count) {
+            invalidAccessor("Draco accessor value count overflows");
+        }
+        return count;
     }
 
     const Json& indexed(const Json& array, std::size_t index, const char* name) const {
@@ -621,30 +679,177 @@ void appendFragment(const ClippedTriangle& fragment, const VertexLayout& layout,
 
 PrimitiveOutput processPrimitive(const GlbSource& source, const Json& primitive,
                                  const Matrix4& world_transform, const AuthorizationScope& scope,
-                                 MaterialCatalog& materials, BufferBuilder& output_buffer) {
-    requireAllowedKeys(primitive, {"attributes", "indices", "material", "mode"}, "primitive");
+                                 MaterialCatalog& materials, BufferBuilder& output_buffer,
+                                 std::uint32_t batch_length,
+                                 DracoCompatibilityDiagnostics& draco_diagnostics) {
+    requireAllowedKeys(primitive,
+                       {"attributes", "indices", "material", "mode", "extensions"},
+                       "primitive");
     if (primitive.value("mode", kGlTriangles) != kGlTriangles) { unsupported("Only TRIANGLES primitives are supported"); }
     if (!primitive.contains("attributes") || !primitive.at("attributes").is_object()) { invalidAccessor("Primitive attributes are missing"); }
     const Json& attributes = primitive.at("attributes");
     requireAllowedKeys(attributes, {"POSITION", "TEXCOORD_0", "NORMAL", "COLOR_0", "_BATCHID"}, "primitive attributes");
     if (!attributes.contains("POSITION")) { invalidAccessor("Primitive POSITION is missing"); }
-    const auto positions = source.readFloatAccessor(checkedSize(attributes, "POSITION"), 3U, "VEC3");
+
+    const Json* draco_mapping = nullptr;
+    std::optional<formats::DecodedDracoMesh> draco_mesh;
+    std::map<std::string, std::uint32_t> draco_attribute_ids;
+    std::map<std::string, std::size_t> draco_accessor_counts;
+    bool primitive_has_draco_count_compatibility = false;
+    if (primitive.contains("extensions")) {
+        const Json& extensions = primitive.at("extensions");
+        requireAllowedKeys(extensions, {kDracoExtension}, "primitive extensions");
+        if (extensions.contains(kDracoExtension)) {
+            const Json& draco = extensions.at(kDracoExtension);
+            requireAllowedKeys(draco, {"bufferView", "attributes"},
+                               "KHR_draco_mesh_compression");
+            if (!draco.contains("attributes") || !draco.at("attributes").is_object()
+                || draco.at("attributes").empty()) {
+                invalidAccessor("Draco primitive attribute mapping is missing");
+            }
+            draco_mapping = &draco.at("attributes");
+            requireAllowedKeys(*draco_mapping,
+                               {"POSITION", "TEXCOORD_0", "NORMAL", "COLOR_0",
+                                "_BATCHID"},
+                               "Draco primitive attributes");
+
+            std::vector<formats::DracoAttributeRequest> requests;
+            auto add_request = [&](const char* semantic, std::size_t components,
+                                   const char* type,
+                                   formats::DracoAttributeValueType value_type) {
+                if (!draco_mapping->contains(semantic)) {
+                    return;
+                }
+                if (!attributes.contains(semantic)) {
+                    invalidAccessor(std::string("Draco mapping is missing primitive semantic: ")
+                                    + semantic);
+                }
+                const std::size_t unique_id = checkedSize(*draco_mapping, semantic);
+                if (unique_id > std::numeric_limits<std::uint32_t>::max()) {
+                    invalidAccessor("Draco attribute unique id exceeds uint32");
+                }
+                const std::size_t accessor_index = checkedSize(attributes, semantic);
+                const std::size_t accessor_count =
+                        value_type == formats::DracoAttributeValueType::unsigned_integer
+                        ? source.validateDracoUnsignedScalarAccessor(accessor_index)
+                        : source.validateDracoFloatAccessor(accessor_index, components, type);
+                const auto id = static_cast<std::uint32_t>(unique_id);
+                draco_attribute_ids.emplace(semantic, id);
+                draco_accessor_counts.emplace(semantic, accessor_count);
+                requests.push_back({id, components, value_type});
+            };
+            add_request("POSITION", 3U, "VEC3",
+                        formats::DracoAttributeValueType::floating_point);
+            add_request("TEXCOORD_0", 2U, "VEC2",
+                        formats::DracoAttributeValueType::floating_point);
+            add_request("NORMAL", 3U, "VEC3",
+                        formats::DracoAttributeValueType::floating_point);
+            if (draco_mapping->contains("COLOR_0")) {
+                const std::size_t accessor_index = checkedSize(attributes, "COLOR_0");
+                const auto& accessor = source.requiredArray("accessors").at(accessor_index);
+                const std::string type = accessor.value("type", std::string());
+                const std::size_t components = type == "VEC4" ? 4U
+                                                : type == "VEC3" ? 3U : 0U;
+                if (components == 0U) {
+                    invalidAccessor("COLOR_0 must be VEC3 or VEC4");
+                }
+                add_request("COLOR_0", components, type.c_str(),
+                            formats::DracoAttributeValueType::floating_point);
+            }
+            add_request("_BATCHID", 1U, "SCALAR",
+                        formats::DracoAttributeValueType::unsigned_integer);
+
+            const auto compressed = source.bufferViewBytes(
+                    checkedSize(draco, "bufferView"));
+            draco_mesh = formats::DracoDecoder::decode(
+                    formats::ByteView(compressed), requests);
+            std::optional<std::size_t> declared_vertex_count;
+            bool count_mismatch = false;
+            for (const auto& item : draco_accessor_counts) {
+                if (declared_vertex_count.has_value()
+                    && item.second != *declared_vertex_count) {
+                    invalidAccessor("Draco attribute accessors have inconsistent counts");
+                }
+                declared_vertex_count = item.second;
+                if (item.second != draco_mesh->point_count) {
+                    ++draco_diagnostics.affected_accessor_count;
+                    count_mismatch = true;
+                }
+            }
+            if (count_mismatch) {
+                // Some deployed generators leave pre-compression accessor counts in the
+                // JSON even though Draco changes the point topology. The decoded mesh is
+                // authoritative and is fully expanded and bounds-checked by DracoDecoder.
+                ++draco_diagnostics.affected_primitive_count;
+                primitive_has_draco_count_compatibility = true;
+                draco_diagnostics.maximum_declared_vertex_count = std::max(
+                        draco_diagnostics.maximum_declared_vertex_count,
+                        declared_vertex_count.value_or(0U));
+                draco_diagnostics.maximum_decoded_point_count = std::max(
+                        draco_diagnostics.maximum_decoded_point_count,
+                        draco_mesh->point_count);
+            }
+        }
+    }
+
+    auto read_float_attribute = [&](const char* semantic, std::size_t components,
+                                    const char* type) {
+        const auto mapped = draco_attribute_ids.find(semantic);
+        if (mapped != draco_attribute_ids.end()) {
+            return draco_mesh->floating_attributes.at(mapped->second);
+        }
+        return source.readFloatAccessor(checkedSize(attributes, semantic),
+                                        components, type);
+    };
+    auto read_unsigned_attribute = [&](const char* semantic) {
+        const auto mapped = draco_attribute_ids.find(semantic);
+        if (mapped != draco_attribute_ids.end()) {
+            return draco_mesh->unsigned_attributes.at(mapped->second);
+        }
+        return source.readUnsignedScalarAccessor(checkedSize(attributes, semantic));
+    };
+
+    const auto positions = read_float_attribute("POSITION", 3U, "VEC3");
     const std::size_t vertex_count = positions.size() / 3U; VertexLayout layout;
+    if (draco_mesh.has_value() && vertex_count != draco_mesh->point_count) {
+        invalidAccessor("POSITION count differs from decoded Draco point count");
+    }
     std::vector<double> uv, normals, colors;
-    if (attributes.contains("TEXCOORD_0")) { layout.has_uv = true; layout.uv_offset = layout.payload_size; layout.payload_size += 2U; uv = source.readFloatAccessor(checkedSize(attributes, "TEXCOORD_0"), 2U, "VEC2"); if (uv.size() / 2U != vertex_count) { invalidAccessor("TEXCOORD_0 count differs from POSITION"); } }
-    if (attributes.contains("NORMAL")) { layout.has_normal = true; layout.normal_offset = layout.payload_size; layout.payload_size += 3U; normals = source.readFloatAccessor(checkedSize(attributes, "NORMAL"), 3U, "VEC3"); if (normals.size() / 3U != vertex_count) { invalidAccessor("NORMAL count differs from POSITION"); } }
+    if (attributes.contains("TEXCOORD_0")) { layout.has_uv = true; layout.uv_offset = layout.payload_size; layout.payload_size += 2U; uv = read_float_attribute("TEXCOORD_0", 2U, "VEC2"); if (uv.size() / 2U != vertex_count) { invalidAccessor("TEXCOORD_0 count differs from POSITION"); } }
+    if (attributes.contains("NORMAL")) { layout.has_normal = true; layout.normal_offset = layout.payload_size; layout.payload_size += 3U; normals = read_float_attribute("NORMAL", 3U, "VEC3"); if (normals.size() / 3U != vertex_count) { invalidAccessor("NORMAL count differs from POSITION"); } }
     if (attributes.contains("COLOR_0")) {
         const std::size_t accessor_index = checkedSize(attributes, "COLOR_0");
         const auto& accessor = source.requiredArray("accessors").at(accessor_index);
         const std::string type = accessor.value("type", std::string()); layout.color_components = type == "VEC4" ? 4U : type == "VEC3" ? 3U : 0U;
         if (layout.color_components == 0U) { invalidAccessor("COLOR_0 must be VEC3 or VEC4"); }
-        colors = source.readFloatAccessor(accessor_index, layout.color_components, type.c_str());
+        colors = read_float_attribute("COLOR_0", layout.color_components, type.c_str());
         layout.has_color = true; layout.color_offset = layout.payload_size; layout.payload_size += layout.color_components;
         if (colors.size() / layout.color_components != vertex_count) { invalidAccessor("COLOR_0 count differs from POSITION"); }
     }
-    if (attributes.contains("_BATCHID")) { const auto ids = source.readUnsignedScalarAccessor(checkedSize(attributes, "_BATCHID")); if (ids.size() != vertex_count || std::any_of(ids.begin(), ids.end(), [](std::uint32_t value) { return value != 0U; })) { unsupported("Only single-feature _BATCHID=0 is supported"); } }
+    if (attributes.contains("_BATCHID")) { const auto ids = read_unsigned_attribute("_BATCHID"); if (batch_length != 1U || ids.size() != vertex_count || std::any_of(ids.begin(), ids.end(), [](std::uint32_t value) { return value != 0U; })) { unsupported("_BATCHID is only supported as zero for BATCH_LENGTH=1"); } }
     std::vector<std::uint32_t> indices;
-    if (primitive.contains("indices")) { indices = source.readUnsignedScalarAccessor(checkedSize(primitive, "indices")); }
+    if (draco_mesh.has_value()) {
+        indices = draco_mesh->indices;
+        if (primitive.contains("indices")) {
+            const std::size_t declared_index_count =
+                    source.validateDracoUnsignedScalarAccessor(
+                    checkedSize(primitive, "indices"));
+            if (declared_index_count != indices.size()) {
+                if (!primitive_has_draco_count_compatibility) {
+                    ++draco_diagnostics.affected_primitive_count;
+                    primitive_has_draco_count_compatibility = true;
+                }
+                ++draco_diagnostics.affected_index_count;
+                draco_diagnostics.maximum_declared_index_count = std::max(
+                        draco_diagnostics.maximum_declared_index_count,
+                        declared_index_count);
+                draco_diagnostics.maximum_decoded_index_count = std::max(
+                        draco_diagnostics.maximum_decoded_index_count,
+                        indices.size());
+            }
+        }
+    }
+    else if (primitive.contains("indices")) { indices = source.readUnsignedScalarAccessor(checkedSize(primitive, "indices")); }
     else { indices.resize(vertex_count); for (std::size_t index = 0; index < vertex_count; ++index) { indices[index] = static_cast<std::uint32_t>(index); } }
     if (indices.empty() || indices.size() % 3U != 0U || std::any_of(indices.begin(), indices.end(), [vertex_count](std::uint32_t value) { return value >= vertex_count; })) { invalidAccessor("Primitive triangle indices are invalid"); }
     PrimitiveOutput result; result.input_vertices = vertex_count; result.input_triangles = indices.size() / 3U;
@@ -859,7 +1064,8 @@ SanitizedScene sanitizeActiveScene(
     return result;
 }
 
-std::string sanitizeBatchTable(const std::string& source_json) {
+std::string sanitizeBatchTable(const std::string& source_json,
+                               std::uint32_t batch_length) {
     if (source_json.empty()) {
         return {};
     }
@@ -869,11 +1075,11 @@ std::string sanitizeBatchTable(const std::string& source_json) {
     }
     Json output = Json::object();
     for (auto property = source.begin(); property != source.end(); ++property) {
-        if (!property.value().is_array() || property.value().size() != 1U) {
-            unsupported("B3DM batch table properties must contain exactly one feature");
+        if (!property.value().is_array()
+            || property.value().size() != batch_length) {
+            unsupported("B3DM batch table property count differs from BATCH_LENGTH");
         }
-        const auto& value = property.value().at(0U);
-        if (value.is_object()) {
+        if (batch_length == 1U && property.value().at(0U).is_object()) {
             unsupported("Complex B3DM batch table properties are not supported");
         }
         output[property.key()] = property.value();
@@ -890,6 +1096,28 @@ std::optional<std::array<double, 3>> rtcCenter(const Json& feature_table) {
     return numberArray<3U>(feature_table.at("RTC_CENTER"), "RTC_CENTER");
 }
 
+Matrix4 upAxisTransform(task::GltfUpAxis axis) {
+    switch (axis) {
+        case task::GltfUpAxis::x:
+            // X-up to Z-up: (x, y, z) -> (-z, y, x).
+            return Matrix4::fromColumnMajor({
+                    0.0, 0.0, 1.0, 0.0,
+                    0.0, 1.0, 0.0, 0.0,
+                    -1.0, 0.0, 0.0, 0.0,
+                    0.0, 0.0, 0.0, 1.0});
+        case task::GltfUpAxis::y:
+            // Standard glTF Y-up to 3D Tiles Z-up: (x, y, z) -> (x, -z, y).
+            return Matrix4::fromColumnMajor({
+                    1.0, 0.0, 0.0, 0.0,
+                    0.0, 0.0, 1.0, 0.0,
+                    0.0, -1.0, 0.0, 0.0,
+                    0.0, 0.0, 0.0, 1.0});
+        case task::GltfUpAxis::z:
+            return Matrix4::identity();
+    }
+    throw std::invalid_argument("Unknown glTF up axis enum value");
+}
+
 std::vector<std::uint8_t> buildGlb(Json json, BufferBuilder& buffer) {
     buffer.finish(); json["buffers"] = Json::array({{{"byteLength", buffer.bytes().size()}}}); json["bufferViews"] = buffer.views(); json["accessors"] = buffer.accessors();
     std::string text = json.dump(); while (text.size() % 4U != 0U) { text.push_back(' '); }
@@ -901,20 +1129,21 @@ std::vector<std::uint8_t> buildGlb(Json json, BufferBuilder& buffer) {
 
 std::vector<std::uint8_t> buildB3dm(
         const std::vector<std::uint8_t>& glb, const std::string& batch_json,
-        const std::optional<std::array<double, 3>>& rtc_center) {
-    Json feature_json = {{"BATCH_LENGTH", 1U}};
+        const std::optional<std::array<double, 3>>& rtc_center,
+        std::uint32_t batch_length) {
+    Json feature_json = {{"BATCH_LENGTH", batch_length}};
     if (rtc_center.has_value()) {
         feature_json["RTC_CENTER"] = *rtc_center;
     }
     const std::string feature = feature_json.dump(); std::vector<std::uint8_t> output(formats::B3dmParser::kHeaderSize, 0U); output[0] = 'b'; output[1] = '3'; output[2] = 'd'; output[3] = 'm';
     const std::size_t feature_start = output.size(); output.insert(output.end(), feature.begin(), feature.end()); while (output.size() % 8U != 0U) { output.push_back(' '); } const std::size_t feature_length = output.size() - feature_start;
-    const std::size_t batch_start = output.size(); if (!batch_json.empty()) { const std::string normalized = Json::parse(batch_json).dump(); output.insert(output.end(), normalized.begin(), normalized.end()); while (output.size() % 8U != 0U) { output.push_back(' '); } } const std::size_t batch_length = output.size() - batch_start; output.insert(output.end(), glb.begin(), glb.end());
+    const std::size_t batch_start = output.size(); if (!batch_json.empty()) { const std::string normalized = Json::parse(batch_json).dump(); output.insert(output.end(), normalized.begin(), normalized.end()); while (output.size() % 8U != 0U) { output.push_back(' '); } } const std::size_t batch_json_length = output.size() - batch_start; output.insert(output.end(), glb.begin(), glb.end());
     while (output.size() % formats::B3dmParser::kGlbAlignment != 0U) {
         output.push_back(0U);
     }
     if (output.size() > std::numeric_limits<std::uint32_t>::max()) { unsupported("Output B3DM exceeds the format limit"); }
     auto write = [&output](std::size_t offset, std::uint32_t value) { for (std::size_t i = 0; i < 4U; ++i) { output[offset + i] = static_cast<std::uint8_t>((value >> (i * 8U)) & 0xFFU); } };
-    write(4U, 1U); write(8U, static_cast<std::uint32_t>(output.size())); write(12U, static_cast<std::uint32_t>(feature_length)); write(20U, static_cast<std::uint32_t>(batch_length)); return output;
+    write(4U, 1U); write(8U, static_cast<std::uint32_t>(output.size())); write(12U, static_cast<std::uint32_t>(feature_length)); write(20U, static_cast<std::uint32_t>(batch_json_length)); return output;
 }
 
 }  // namespace
@@ -923,7 +1152,8 @@ B3dmClipResult B3dmClipper::clip(
         const std::vector<std::uint8_t>& source_bytes,
         const task::ClaimTask& task,
         const SourceLayoutObserver& source_layout_observer,
-        const SamplerCompatibilityObserver& sampler_compatibility_observer) {
+        const SamplerCompatibilityObserver& sampler_compatibility_observer,
+        const DracoCompatibilityObserver& draco_compatibility_observer) {
     try {
         if (!task.clip_options.mask_textures
             || !task.clip_options.compact_feature_metadata
@@ -938,10 +1168,14 @@ B3dmClipResult B3dmClipper::clip(
         }
         B3dmClipResult result;
         result.source_layout = document.layout;
-        if (document.batch_length != 1U
-            || document.header.feature_table_binary_length != 0U
-            || document.header.batch_table_binary_length != 0U) {
-            unsupported("Only BATCH_LENGTH=1 without binary tables is supported");
+        if (document.batch_length > 1U) {
+            unsupported("BATCH_LENGTH greater than one is not supported");
+        }
+        if (document.header.feature_table_binary_length != 0U) {
+            unsupported("Feature Table Binary is not supported");
+        }
+        if (document.header.batch_table_binary_length != 0U) {
+            unsupported("Batch Table Binary is not supported");
         }
         const Json feature_table = Json::parse(document.feature_table_json_text);
         if (!feature_table.is_object()
@@ -966,9 +1200,11 @@ B3dmClipResult B3dmClipper::clip(
         const Matrix4 content_transform = rtc_center.has_value()
                 ? tile_transform * Matrix4::translation(*rtc_center)
                 : tile_transform;
+        const Matrix4 axis_transform = upAxisTransform(task.gltf_up_axis);
         const SceneTransforms transforms = sceneTransforms(source);
         MaterialCatalog materials(source);
         BufferBuilder output_buffer;
+        DracoCompatibilityDiagnostics draco_diagnostics;
 
         Json output_meshes = Json::array();
         std::vector<std::optional<std::size_t>> mesh_mapping(
@@ -986,11 +1222,12 @@ B3dmClipResult B3dmClipper::clip(
                 unsupported("Mesh primitives are missing");
             }
             Json output_primitives = Json::array();
-            const Matrix4 world = content_transform
+            const Matrix4 world = content_transform * axis_transform
                                   * *transforms.mesh_transforms[mesh_index];
             for (const auto& primitive : mesh.at("primitives")) {
                 PrimitiveOutput processed = processPrimitive(
-                        source, primitive, world, scope, materials, output_buffer);
+                        source, primitive, world, scope, materials, output_buffer,
+                        document.batch_length, draco_diagnostics);
                 result.statistics.vertex_count_before += processed.input_vertices;
                 result.statistics.triangle_count_before += processed.input_triangles;
                 result.statistics.vertex_count_after += processed.output_vertices;
@@ -1008,6 +1245,10 @@ B3dmClipResult B3dmClipper::clip(
                 mesh_mapping[mesh_index] = output_meshes.size();
                 output_meshes.push_back({{"primitives", std::move(output_primitives)}});
             }
+        }
+        if (draco_compatibility_observer
+            && draco_diagnostics.requiresCompatibility()) {
+            draco_compatibility_observer(draco_diagnostics);
         }
         if (result.statistics.triangle_count_after == 0U) {
             result.empty = true;
@@ -1121,7 +1362,9 @@ B3dmClipResult B3dmClipper::clip(
 
         result.bytes = buildB3dm(
                 buildGlb(std::move(output_json), output_buffer),
-                sanitizeBatchTable(document.batch_table_json_text), rtc_center);
+                sanitizeBatchTable(document.batch_table_json_text,
+                                   document.batch_length),
+                rtc_center, document.batch_length);
         const auto verified = formats::B3dmParser::parse(
                 formats::ByteView(result.bytes));
         if (verified.layout.requiresCompatibility()) {

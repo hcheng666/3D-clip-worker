@@ -13,6 +13,8 @@ enum class ContentFormat {
 };
 
 enum class GltfUpAxis {
+    x,
+    y,
     z
 };
 
