@@ -1,0 +1,58 @@
+{
+  "claimRequest": {
+    "messageType": "CLAIM_REQUEST",
+    "workerId": "normalizer-v2-worker",
+    "protocolVersion": "THREE_D_TILES_NORMALIZER_V2",
+    "schemaSha256": "4926bba1c29b47eb148fe3abdfafd22c67adabbb645e102321d6affb8c8219a6",
+    "decoderCapabilities": ["DRACO", "JPEG", "KTX2", "MESHOPT", "PNG", "WEBP"],
+    "familyCapabilities": [
+      {
+        "canonicalFamily": "POINT_GLTF2",
+        "normalizationVersion": "normalization-point-v1",
+        "canonicalContractVersion": "canonical-point-gltf2-v1",
+        "validatorName": "point-validator",
+        "validatorVersion": "validator-v1",
+        "validatorBuildSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "maximumInputBytes": 4294967296,
+        "maximumOutputBytes": 4294967296
+      }
+    ],
+    "resourceProfileVersion": "STANDARD_4CPU_8GIB_SINGLE_TASK_V3",
+    "resourceProfileSha256": "d6097a29380375180e2cf9374eae354a9672e0589f3fb04b2f85930f16d5af78",
+    "toolVersions": [
+      {
+        "name": "point-validator",
+        "version": "validator-v1",
+        "buildSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    ]
+  },
+  "claimResponse": {
+    "messageType": "CLAIM_RESPONSE",
+    "taskId": "task-v2",
+    "attemptId": "attempt-v2",
+    "requestId": "request-v2",
+    "leaseToken": "lease-v2",
+    "leaseExpireTime": "2026-08-23T00:05:00Z",
+    "hardDeadlineTime": "2026-08-23T00:15:00Z",
+    "tileContentId": "content-v2",
+    "rootObjectId": "root-object-v2",
+    "sourceClosureHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "resourceClosureVersion": "resource-closure-v1",
+    "normalizationVersion": "normalization-point-v1",
+    "canonicalFamily": "POINT_GLTF2",
+    "canonicalContractVersion": "canonical-point-gltf2-v1",
+    "resourceProfileVersion": "STANDARD_4CPU_8GIB_SINGLE_TASK_V3",
+    "resourceProfileSha256": "d6097a29380375180e2cf9374eae354a9672e0589f3fb04b2f85930f16d5af78",
+    "requiredDecoders": [],
+    "maximumOutputs": 1,
+    "resourceManifest": {
+      "manifestVersion": "NORMALIZATION_RESOURCE_MANIFEST_V2",
+      "manifestId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "pageCount": 1,
+      "pageSize": 1000,
+      "recordCount": 1,
+      "manifestSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  }
+}

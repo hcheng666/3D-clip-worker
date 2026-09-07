@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 3,
+  "defaultProfile": "STANDARD_4CPU_8GIB_SINGLE_TASK_V3",
+  "profiles": [
+    {
+      "id": "STANDARD_4CPU_8GIB_SINGLE_TASK_V3",
+      "description": "Point, instance, and recursive composite normalization limits for one 4 vCPU / 8 GiB worker task.",
+      "point": {
+        "maximumPoints": 10000000,
+        "maximumDecodedBytes": 1073741824
+      },
+      "instance": {
+        "maximumInstances": 250000,
+        "maximumDecodedBytes": 1073741824,
+        "maximumExpandedVertices": 5000000,
+        "maximumExpandedIndices": 6000000,
+        "maximumBoundaryInstances": 250000
+      },
+      "composite": {
+        "maximumDepth": 8,
+        "maximumChildren": 1024,
+        "maximumOutputs": 1025
+      },
+      "metadata": {
+        "maximumFeatureRows": 10000000,
+        "maximumProperties": 4096,
+        "maximumStringBytes": 67108864,
+        "maximumBinaryBytes": 268435456
+      },
+      "policy": {
+        "limitFailureMode": "FAIL_CLOSED",
+        "pointNormalizationVersion": "normalization-point-v1",
+        "pointCanonicalContractVersion": "canonical-point-gltf2-v1",
+        "instanceNormalizationVersion": "normalization-instance-v1",
+        "instanceCanonicalContractVersion": "canonical-instance-gltf2-v1",
+        "compositeNormalizationVersion": "normalization-composite-v1",
+        "compositeCanonicalContractVersion": "canonical-composite-children-v1"
+      }
+    }
+  ]
+}

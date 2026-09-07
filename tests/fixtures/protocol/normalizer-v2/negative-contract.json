@@ -1,0 +1,11 @@
+{
+  "credentialBearingClaimResponse": {
+    "messageType": "CLAIM_RESPONSE",
+    "taskId": "task-v2",
+    "attemptId": "attempt-v2",
+    "requestId": "request-v2",
+    "leaseToken": "lease-v2",
+    "rootObjectId": "root-object-v2",
+    "bucketName": "must-not-exist"
+  }
+}

@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "gateId": "point-instance-composite-normalization-clipping-task-7-v1",
+  "protocolVersion": "THREE_D_TILES_NORMALIZER_V2",
+  "resourceProfileVersion": "STANDARD_4CPU_8GIB_SINGLE_TASK_V3",
+  "resourceProfileSha256": "d6097a29380375180e2cf9374eae354a9672e0589f3fb04b2f85930f16d5af78",
+  "familyVersions": {
+    "POINT_GLTF2": {
+      "normalizationVersion": "normalization-point-v1",
+      "canonicalContractVersion": "canonical-point-gltf2-v1"
+    },
+    "INSTANCE_GLTF2": {
+      "normalizationVersion": "normalization-instance-v1",
+      "canonicalContractVersion": "canonical-instance-gltf2-v1"
+    },
+    "COMPOSITE_CHILDREN": {
+      "normalizationVersion": "normalization-composite-v1",
+      "canonicalContractVersion": "canonical-composite-children-v1"
+    }
+  },
+  "requiredTestSlices": [
+    "POSITION_QUANTIZATION",
+    "COLOR",
+    "NORMAL",
+    "RTC_CENTER",
+    "ORIENTATION",
+    "SCALE",
+    "EXTERNAL_MODEL",
+    "METADATA_COMPACTION",
+    "POINT_EXACT_CLIP",
+    "INSTANCE_CONSERVATIVE_CLIP",
+    "BOUNDARY_EXPANSION",
+    "NESTED_COMPOSITE",
+    "MIXED_UNSUPPORTED_CHILD",
+    "EMPTY_RESULT",
+    "DETERMINISM",
+    "RESOURCE_LIMIT"
+  ],
+  "entries": [
+    {
+      "entryId": "cesium-point-cloud",
+      "variants": [
+        {
+          "id": "quantized-position",
+          "selectors": ["PointCloudQuantized/*.pnts"],
+          "outcome": "SUPPORTED",
+          "slices": ["POSITION_QUANTIZATION"]
+        },
+        {
+          "id": "oct-encoded-normal",
+          "selectors": ["PointCloudNormalsOctEncoded/*.pnts", "PointCloudQuantizedOctEncoded/*.pnts"],
+          "outcome": "SUPPORTED",
+          "slices": ["NORMAL"]
+        },
+        {
+          "id": "color-encodings",
+          "selectors": ["PointCloudRGB/*.pnts", "PointCloudRGBA/*.pnts", "PointCloudRGB565/*.pnts", "PointCloudConstantColor/*.pnts"],
+          "outcome": "SUPPORTED",
+          "slices": ["COLOR"]
+        },
+        {
+          "id": "legacy-point-properties",
+          "selectors": ["PointCloudBatched/*.pnts", "PointCloudWithPerPointProperties/*.pnts"],
+          "outcome": "SUPPORTED",
+          "slices": ["METADATA_COMPACTION"]
+        },
+        {
+          "id": "rtc-georeferenced-point-cloud",
+          "selectors": ["PointCloudWGS84/*.pnts", "PointCloudWithTransform/*.pnts"],
+          "outcome": "SUPPORTED",
+          "slices": ["RTC_CENTER"]
+        }
+      ]
+    },
+    {
+      "entryId": "cesium-instanced",
+      "variants": [
+        {
+          "id": "external-model",
+          "selectors": ["InstancedGltfExternal/*.i3dm", "InstancedGltfExternal/*.glb"],
+          "outcome": "UNSUPPORTED",
+          "reason": "I3DM_ENU_UNSUPPORTED",
+          "slices": ["EXTERNAL_MODEL"]
+        },
+        {
+          "id": "explicit-and-oct-orientation",
+          "selectors": ["InstancedOrientation/*.i3dm", "InstancedOct32POrientation/*.i3dm", "InstancedQuantizedOct32POrientation/*.i3dm", "InstancedWithTransform/*.i3dm"],
+          "outcome": "SUPPORTED",
+          "slices": ["ORIENTATION"]
+        },
+        {
+          "id": "quantized-position-and-rtc",
+          "selectors": ["InstancedQuantized/*.i3dm", "InstancedRTC/*.i3dm", "InstancedZeroRTC/*.i3dm"],
+          "outcome": "UNSUPPORTED",
+          "reason": "I3DM_ENU_UNSUPPORTED",
+          "slices": ["POSITION_QUANTIZATION", "RTC_CENTER"]
+        },
+        {
+          "id": "uniform-and-nonuniform-scale",
+          "selectors": ["InstancedScale/*.i3dm", "InstancedScaleNonUniform/*.i3dm"],
+          "outcome": "UNSUPPORTED",
+          "reason": "I3DM_ENU_UNSUPPORTED",
+          "slices": ["SCALE"]
+        },
+        {
+          "id": "legacy-instance-properties",
+          "selectors": ["InstancedWithBatchIds/*.i3dm", "InstancedWithBatchTable/*.i3dm", "InstancedWithBatchTableBinary/*.i3dm"],
+          "outcome": "UNSUPPORTED",
+          "reason": "I3DM_ENU_UNSUPPORTED",
+          "slices": ["METADATA_COMPACTION"]
+        }
+      ]
+    },
+    {
+      "entryId": "cesium-composite",
+      "variants": [
+        {
+          "id": "mixed-children-with-unsupported-enu-instance",
+          "selectors": ["Composite/*.cmpt", "CompositeOfInstanced/*.cmpt"],
+          "outcome": "UNSUPPORTED",
+          "reason": "CMPT_CHILD_UNSUPPORTED",
+          "slices": ["DETERMINISM"]
+        },
+        {
+          "id": "recursive-composite",
+          "selectors": ["CompositeOfComposite/*.cmpt"],
+          "outcome": "UNSUPPORTED",
+          "reason": "CMPT_CHILD_UNSUPPORTED",
+          "slices": ["NESTED_COMPOSITE"]
+        }
+      ]
+    }
+  ],
+  "nativeEvidence": [
+    {
+      "test": "PointSceneClipperTest.*",
+      "slices": ["POINT_EXACT_CLIP", "METADATA_COMPACTION", "EMPTY_RESULT", "DETERMINISM"]
+    },
+    {
+      "test": "InstanceNormalizerTest.*",
+      "slices": ["POSITION_QUANTIZATION", "RTC_CENTER", "ORIENTATION", "SCALE", "EXTERNAL_MODEL", "METADATA_COMPACTION", "DETERMINISM"]
+    },
+    {
+      "test": "CanonicalInstanceClipStrategyTest.*",
+      "slices": ["INSTANCE_CONSERVATIVE_CLIP", "BOUNDARY_EXPANSION", "METADATA_COMPACTION", "RESOURCE_LIMIT"]
+    },
+    {
+      "test": "CompositeNormalizerTest.*",
+      "slices": ["NESTED_COMPOSITE", "MIXED_UNSUPPORTED_CHILD", "DETERMINISM"]
+    },
+    {
+      "test": "BroadResourceProfileTest.*",
+      "slices": ["RESOURCE_LIMIT"]
+    }
+  ]
+}

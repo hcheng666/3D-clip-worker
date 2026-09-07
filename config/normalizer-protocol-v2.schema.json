@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:justai:three-d-tiles:normalizer:v2",
+  "title": "THREE_D_TILES_NORMALIZER_V2",
+  "oneOf": [
+    {"$ref": "#/$defs/claimRequest"},
+    {"$ref": "#/$defs/claimResponse"},
+    {"$ref": "#/$defs/resourceManifestPage"},
+    {"$ref": "#/$defs/heartbeatRequest"},
+    {"$ref": "#/$defs/heartbeatResponse"},
+    {"$ref": "#/$defs/outputPrepareRequest"},
+    {"$ref": "#/$defs/outputPrepareResponse"},
+    {"$ref": "#/$defs/outputReportRequest"},
+    {"$ref": "#/$defs/completeRequest"},
+    {"$ref": "#/$defs/failRequest"}
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "nonBlank": {"type": "string", "minLength": 1, "maxLength": 2048},
+    "decoder": {"enum": ["DRACO", "MESHOPT", "PNG", "JPEG", "WEBP", "KTX2"]},
+    "canonicalFamily": {"enum": ["MESH_GLTF2", "POINT_GLTF2", "INSTANCE_GLTF2", "COMPOSITE_CHILDREN"]},
+    "ordinalPath": {"type": "array", "maxItems": 8, "items": {"type": "integer", "minimum": 0, "maximum": 4294967295}},
+    "familyCapability": {
+      "type": "object", "additionalProperties": false,
+      "required": ["canonicalFamily", "normalizationVersion", "canonicalContractVersion", "validatorName", "validatorVersion", "validatorBuildSha256", "maximumInputBytes", "maximumOutputBytes"],
+      "properties": {
+        "canonicalFamily": {"$ref": "#/$defs/canonicalFamily"},
+        "normalizationVersion": {"$ref": "#/$defs/nonBlank"},
+        "canonicalContractVersion": {"$ref": "#/$defs/nonBlank"},
+        "validatorName": {"$ref": "#/$defs/nonBlank"},
+        "validatorVersion": {"$ref": "#/$defs/nonBlank"},
+        "validatorBuildSha256": {"$ref": "#/$defs/sha256"},
+        "maximumInputBytes": {"type": "integer", "minimum": 1},
+        "maximumOutputBytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "manifestDescriptor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["manifestVersion", "manifestId", "pageCount", "pageSize", "recordCount", "manifestSha256"],
+      "properties": {
+        "manifestVersion": {"const": "NORMALIZATION_RESOURCE_MANIFEST_V2"},
+        "manifestId": {"$ref": "#/$defs/sha256"},
+        "pageCount": {"type": "integer", "minimum": 1, "maximum": 100000},
+        "pageSize": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "recordCount": {"type": "integer", "minimum": 1, "maximum": 1000000},
+        "manifestSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "claimRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["messageType", "workerId", "protocolVersion", "schemaSha256", "decoderCapabilities", "familyCapabilities", "resourceProfileVersion", "resourceProfileSha256", "toolVersions"],
+      "properties": {
+        "messageType": {"const": "CLAIM_REQUEST"},
+        "workerId": {"$ref": "#/$defs/nonBlank"},
+        "protocolVersion": {"const": "THREE_D_TILES_NORMALIZER_V2"},
+        "schemaSha256": {"$ref": "#/$defs/sha256"},
+        "decoderCapabilities": {"type": "array", "maxItems": 6, "uniqueItems": true, "items": {"$ref": "#/$defs/decoder"}},
+        "familyCapabilities": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"$ref": "#/$defs/familyCapability"}},
+        "resourceProfileVersion": {"const": "STANDARD_4CPU_8GIB_SINGLE_TASK_V3"},
+        "resourceProfileSha256": {"$ref": "#/$defs/sha256"},
+        "toolVersions": {"type": "array", "minItems": 1, "maxItems": 32, "items": {"type": "object", "additionalProperties": false, "required": ["name", "version", "buildSha256"], "properties": {"name": {"$ref": "#/$defs/nonBlank"}, "version": {"$ref": "#/$defs/nonBlank"}, "buildSha256": {"$ref": "#/$defs/sha256"}}}
+      }
+    },
+    "claimResponse": {
+      "type": "object", "additionalProperties": false,
+      "required": ["messageType", "taskId", "attemptId", "requestId", "leaseToken", "leaseExpireTime", "hardDeadlineTime", "tileContentId", "rootObjectId", "sourceClosureHash", "resourceClosureVersion", "normalizationVersion", "canonicalFamily", "canonicalContractVersion", "resourceProfileVersion", "resourceProfileSha256", "requiredDecoders", "maximumOutputs", "resourceManifest"],
+      "properties": {
+        "messageType": {"const": "CLAIM_RESPONSE"}, "taskId": {"$ref": "#/$defs/nonBlank"}, "attemptId": {"$ref": "#/$defs/nonBlank"}, "requestId": {"$ref": "#/$defs/nonBlank"}, "leaseToken": {"$ref": "#/$defs/nonBlank"},
+        "leaseExpireTime": {"type": "string", "format": "date-time"}, "hardDeadlineTime": {"type": "string", "format": "date-time"}, "tileContentId": {"$ref": "#/$defs/nonBlank"}, "rootObjectId": {"$ref": "#/$defs/nonBlank"},
+        "sourceClosureHash": {"$ref": "#/$defs/sha256"}, "resourceClosureVersion": {"$ref": "#/$defs/nonBlank"}, "normalizationVersion": {"$ref": "#/$defs/nonBlank"}, "canonicalFamily": {"$ref": "#/$defs/canonicalFamily"}, "canonicalContractVersion": {"$ref": "#/$defs/nonBlank"},
+        "resourceProfileVersion": {"const": "STANDARD_4CPU_8GIB_SINGLE_TASK_V3"}, "resourceProfileSha256": {"$ref": "#/$defs/sha256"}, "requiredDecoders": {"type": "array", "maxItems": 6, "uniqueItems": true, "items": {"$ref": "#/$defs/decoder"}}, "maximumOutputs": {"type": "integer", "minimum": 1, "maximum": 1025}, "resourceManifest": {"$ref": "#/$defs/manifestDescriptor"}
+      }
+    },
+    "accessGrant": {"type": "object", "additionalProperties": false, "required": ["grantId", "httpMethod", "url", "expiresAt"], "properties": {"grantId": {"$ref": "#/$defs/sha256"}, "httpMethod": {"const": "GET"}, "url": {"type": "string", "format": "uri"}, "expiresAt": {"type": "string", "format": "date-time"}}},
+    "resourceRecord": {"type": "object", "additionalProperties": false, "required": ["objectId", "packageRelativePath", "resourceRole", "detectedKind", "size", "sha256", "requiredExtensions", "usedExtensions", "dependencyIds", "accessGrant"], "properties": {"objectId": {"$ref": "#/$defs/nonBlank"}, "packageRelativePath": {"$ref": "#/$defs/nonBlank"}, "resourceRole": {"$ref": "#/$defs/nonBlank"}, "detectedKind": {"$ref": "#/$defs/nonBlank"}, "detectedVersion": {"type": ["string", "null"], "maxLength": 128}, "mediaType": {"type": ["string", "null"], "maxLength": 256}, "size": {"type": "integer", "minimum": 0}, "sha256": {"$ref": "#/$defs/sha256"}, "requiredExtensions": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/nonBlank"}}, "usedExtensions": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/nonBlank"}}, "dependencyIds": {"type": "array", "maxItems": 1000000, "uniqueItems": true, "items": {"$ref": "#/$defs/nonBlank"}}, "accessGrant": {"$ref": "#/$defs/accessGrant"}}},
+    "resourceManifestPage": {"type": "object", "additionalProperties": false, "required": ["messageType", "manifestId", "pageNumber", "recordCount", "pageSha256", "records"], "properties": {"messageType": {"const": "RESOURCE_MANIFEST_PAGE"}, "manifestId": {"$ref": "#/$defs/sha256"}, "pageNumber": {"type": "integer", "minimum": 1}, "recordCount": {"type": "integer", "minimum": 1, "maximum": 1000}, "pageSha256": {"$ref": "#/$defs/sha256"}, "records": {"type": "array", "minItems": 1, "maxItems": 1000, "items": {"$ref": "#/$defs/resourceRecord"}}}},
+    "heartbeatRequest": {"type": "object", "additionalProperties": false, "required": ["messageType", "workerId", "leaseToken", "requestId", "phase", "processedResources", "totalResources"], "properties": {"messageType": {"const": "HEARTBEAT_REQUEST"}, "workerId": {"$ref": "#/$defs/nonBlank"}, "leaseToken": {"$ref": "#/$defs/nonBlank"}, "requestId": {"$ref": "#/$defs/nonBlank"}, "phase": {"enum": ["CLAIMED", "MANIFEST_FETCH", "RESOURCE_DOWNLOAD", "DECODE", "NORMALIZE", "VALIDATE", "UPLOAD_PREPARE", "UPLOAD", "COMPLETE"]}, "processedResources": {"type": "integer", "minimum": 0}, "totalResources": {"type": "integer", "minimum": 1}}},
+    "heartbeatResponse": {"type": "object", "additionalProperties": false, "required": ["messageType", "leaseExpireTime", "hardDeadlineTime", "cancelRequested"], "properties": {"messageType": {"const": "HEARTBEAT_RESPONSE"}, "leaseExpireTime": {"type": "string", "format": "date-time"}, "hardDeadlineTime": {"type": "string", "format": "date-time"}, "cancelRequested": {"type": "boolean"}}},
+    "validationSummary": {"type": "object", "additionalProperties": false, "required": ["requiredExtensions", "usedExtensions", "validatorName", "validatorVersion", "validatorBuildSha256", "validationHash"], "properties": {"coordinateBasis": {"type": ["string", "null"]}, "sceneCount": {"type": ["integer", "null"], "minimum": 0}, "nodeCount": {"type": ["integer", "null"], "minimum": 0}, "primitiveCount": {"type": ["integer", "null"], "minimum": 0}, "accessorCount": {"type": ["integer", "null"], "minimum": 0}, "bufferCount": {"type": ["integer", "null"], "minimum": 0}, "imageCount": {"type": ["integer", "null"], "minimum": 0}, "featureCount": {"type": ["integer", "null"], "minimum": 0}, "metadataPropertyCount": {"type": ["integer", "null"], "minimum": 0}, "pointCount": {"type": ["integer", "null"], "minimum": 0}, "instanceCount": {"type": ["integer", "null"], "minimum": 0}, "compositeChildCount": {"type": ["integer", "null"], "minimum": 0}, "boundaryExpandedInstanceCount": {"type": ["integer", "null"], "minimum": 0}, "featureIdentityModel": {"type": ["string", "null"]}, "requiredExtensions": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/nonBlank"}}, "usedExtensions": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/nonBlank"}}, "validatorName": {"$ref": "#/$defs/nonBlank"}, "validatorVersion": {"$ref": "#/$defs/nonBlank"}, "validatorBuildSha256": {"$ref": "#/$defs/sha256"}, "validationHash": {"$ref": "#/$defs/sha256"}}},
+    "outputPrepareRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["messageType", "workerId", "leaseToken", "requestId", "outputId", "ordinalPath", "outputKind", "canonicalFamily", "canonicalContractVersion", "outputSize", "outputSha256", "semanticHash", "validationManifestSha256", "validationSummary"],
+      "properties": {"messageType": {"const": "OUTPUT_PREPARE_REQUEST"}, "workerId": {"$ref": "#/$defs/nonBlank"}, "leaseToken": {"$ref": "#/$defs/nonBlank"}, "requestId": {"$ref": "#/$defs/nonBlank"}, "outputId": {"$ref": "#/$defs/sha256"}, "ordinalPath": {"$ref": "#/$defs/ordinalPath"}, "outputKind": {"enum": ["CANONICAL_CONTENT", "PARENT_MANIFEST"]}, "canonicalFamily": {"$ref": "#/$defs/canonicalFamily"}, "canonicalContractVersion": {"$ref": "#/$defs/nonBlank"}, "outputSize": {"type": "integer", "minimum": 1}, "outputSha256": {"$ref": "#/$defs/sha256"}, "semanticHash": {"$ref": "#/$defs/sha256"}, "validationManifestSha256": {"$ref": "#/$defs/sha256"}, "validationSummary": {"$ref": "#/$defs/validationSummary"}}
+    },
+    "outputPrepareResponse": {"type": "object", "additionalProperties": false, "required": ["messageType", "outputId", "uploadGrantId", "httpMethod", "uploadUrl", "expiresAt"], "properties": {"messageType": {"const": "OUTPUT_PREPARE_RESPONSE"}, "outputId": {"$ref": "#/$defs/sha256"}, "uploadGrantId": {"$ref": "#/$defs/sha256"}, "httpMethod": {"const": "PUT"}, "uploadUrl": {"type": "string", "format": "uri"}, "expiresAt": {"type": "string", "format": "date-time"}}},
+    "outputReportRequest": {"type": "object", "additionalProperties": false, "required": ["messageType", "workerId", "leaseToken", "requestId", "outputId", "outputEtag", "outputSize", "outputSha256"], "properties": {"messageType": {"const": "OUTPUT_REPORT_REQUEST"}, "workerId": {"$ref": "#/$defs/nonBlank"}, "leaseToken": {"$ref": "#/$defs/nonBlank"}, "requestId": {"$ref": "#/$defs/nonBlank"}, "outputId": {"$ref": "#/$defs/sha256"}, "outputEtag": {"$ref": "#/$defs/nonBlank"}, "outputSize": {"type": "integer", "minimum": 1}, "outputSha256": {"$ref": "#/$defs/sha256"}}},
+    "completeRequest": {"type": "object", "additionalProperties": false, "required": ["messageType", "workerId", "leaseToken", "requestId", "orderedOutputIds", "outputManifestSha256", "globalPreviewOnly"], "properties": {"messageType": {"const": "COMPLETE_REQUEST"}, "workerId": {"$ref": "#/$defs/nonBlank"}, "leaseToken": {"$ref": "#/$defs/nonBlank"}, "requestId": {"$ref": "#/$defs/nonBlank"}, "orderedOutputIds": {"type": "array", "minItems": 1, "maxItems": 1025, "uniqueItems": true, "items": {"$ref": "#/$defs/sha256"}}, "outputManifestSha256": {"$ref": "#/$defs/sha256"}, "globalPreviewOnly": {"type": "boolean"}}},
+    "failRequest": {"type": "object", "additionalProperties": false, "required": ["messageType", "workerId", "leaseToken", "requestId", "errorCode", "retryable", "unsupported"], "properties": {"messageType": {"const": "FAIL_REQUEST"}, "workerId": {"$ref": "#/$defs/nonBlank"}, "leaseToken": {"$ref": "#/$defs/nonBlank"}, "requestId": {"$ref": "#/$defs/nonBlank"}, "errorCode": {"$ref": "#/$defs/nonBlank"}, "errorMessage": {"type": ["string", "null"], "maxLength": 512}, "retryable": {"type": "boolean"}, "unsupported": {"type": "boolean"}}}
+  }
+}

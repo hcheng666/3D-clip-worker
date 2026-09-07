@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:justai:three-d-tiles:clipper-protocol-v2",
+  "title": "Three D Tiles Clipper V2 protocol",
+  "type": "object",
+  "oneOf": [
+    {"$ref": "#/$defs/claimRequest"},
+    {"$ref": "#/$defs/claimResponse"},
+    {"$ref": "#/$defs/heartbeatRequest"},
+    {"$ref": "#/$defs/outputPrepareRequest"},
+    {"$ref": "#/$defs/outputPrepareResponse"},
+    {"$ref": "#/$defs/outputReportRequest"},
+    {"$ref": "#/$defs/completeRequest"},
+    {"$ref": "#/$defs/failRequest"}
+  ],
+  "$defs": {
+    "nonBlank": {"type": "string", "minLength": 1, "maxLength": 2048, "pattern": "\\S"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "utc": {"type": "string", "format": "date-time"},
+    "family": {"enum": ["MESH_GLTF2", "POINT_GLTF2", "INSTANCE_GLTF2"]},
+    "ordinalPath": {
+      "type": "array", "maxItems": 8,
+      "items": {"type": "integer", "minimum": 0, "maximum": 4294967295}
+    },
+    "lease": {
+      "type": "object", "additionalProperties": false,
+      "required": ["workerId", "attemptId", "requestId", "leaseToken"],
+      "properties": {
+        "workerId": {"$ref": "#/$defs/nonBlank"},
+        "attemptId": {"$ref": "#/$defs/nonBlank"},
+        "requestId": {"$ref": "#/$defs/nonBlank"},
+        "leaseToken": {"$ref": "#/$defs/nonBlank"}
+      }
+    },
+    "familyCapability": {
+      "type": "object", "additionalProperties": false,
+      "required": ["clipContractVersion", "canonicalFamily", "canonicalContractVersion", "clipStrategyVersion", "validatorName", "validatorVersion", "validatorBuildSha256", "maximumInputBytes", "maximumOutputBytes"],
+      "properties": {
+        "clipContractVersion": {"const": "THREE_D_TILES_CLIPPER_V2"},
+        "canonicalFamily": {"$ref": "#/$defs/family"},
+        "canonicalContractVersion": {"$ref": "#/$defs/nonBlank"},
+        "clipStrategyVersion": {"$ref": "#/$defs/nonBlank"},
+        "validatorName": {"$ref": "#/$defs/nonBlank"},
+        "validatorVersion": {"$ref": "#/$defs/nonBlank"},
+        "validatorBuildSha256": {"$ref": "#/$defs/sha256"},
+        "maximumInputBytes": {"type": "integer", "minimum": 1},
+        "maximumOutputBytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "grant": {
+      "type": "object", "additionalProperties": false,
+      "required": ["grantId", "httpMethod", "url", "expiresAt"],
+      "properties": {
+        "grantId": {"$ref": "#/$defs/nonBlank"},
+        "httpMethod": {"enum": ["GET"]},
+        "url": {"type": "string", "minLength": 1, "maxLength": 8192, "format": "uri"},
+        "expiresAt": {"$ref": "#/$defs/utc"}
+      }
+    },
+    "taskLimits": {
+      "type": "object", "additionalProperties": false,
+      "required": ["maximumInputBytes", "maximumOutputBytes", "maximumAggregateOutputBytes", "maximumPoints", "maximumInstances", "maximumBoundaryInstances", "maximumExpandedVertices", "maximumExpandedIndices", "maximumOutputs"],
+      "properties": {
+        "maximumInputBytes": {"type": "integer", "minimum": 1},
+        "maximumOutputBytes": {"type": "integer", "minimum": 1},
+        "maximumAggregateOutputBytes": {"type": "integer", "minimum": 1},
+        "maximumPoints": {"type": "integer", "minimum": 1},
+        "maximumInstances": {"type": "integer", "minimum": 1},
+        "maximumBoundaryInstances": {"type": "integer", "minimum": 1},
+        "maximumExpandedVertices": {"type": "integer", "minimum": 1},
+        "maximumExpandedIndices": {"type": "integer", "minimum": 1},
+        "maximumOutputs": {"type": "integer", "minimum": 1, "maximum": 2}
+      }
+    },
+    "classifier": {
+      "type": "object", "additionalProperties": false,
+      "required": ["relation", "classifierName", "classifierVersion", "inputElementCount", "wholeElementCount", "disjointElementCount", "boundaryElementCount"],
+      "properties": {
+        "relation": {"enum": ["EMPTY", "SAFE_WHOLE", "BOUNDARY"]},
+        "classifierName": {"$ref": "#/$defs/nonBlank"},
+        "classifierVersion": {"$ref": "#/$defs/nonBlank"},
+        "inputElementCount": {"type": "integer", "minimum": 1},
+        "wholeElementCount": {"type": "integer", "minimum": 0},
+        "disjointElementCount": {"type": "integer", "minimum": 0},
+        "boundaryElementCount": {"type": "integer", "minimum": 0}
+      }
+    },
+    "proof": {
+      "type": "object", "additionalProperties": false,
+      "required": ["proofContractVersion", "inputSha256", "inputSemanticHash", "inputValidationManifestSha256", "scopeHash", "transformHash", "canonicalFamily", "canonicalContractVersion", "clipStrategyVersion", "sourceOrdinalPath", "exactClassifier", "proofHash"],
+      "properties": {
+        "proofContractVersion": {"const": "authorization-safe-whole-proof-v1"},
+        "inputSha256": {"$ref": "#/$defs/sha256"},
+        "inputSemanticHash": {"$ref": "#/$defs/sha256"},
+        "inputValidationManifestSha256": {"$ref": "#/$defs/sha256"},
+        "scopeHash": {"$ref": "#/$defs/sha256"},
+        "transformHash": {"$ref": "#/$defs/sha256"},
+        "canonicalFamily": {"$ref": "#/$defs/family"},
+        "canonicalContractVersion": {"$ref": "#/$defs/nonBlank"},
+        "clipStrategyVersion": {"$ref": "#/$defs/nonBlank"},
+        "sourceOrdinalPath": {"$ref": "#/$defs/ordinalPath"},
+        "exactClassifier": {"$ref": "#/$defs/classifier"},
+        "proofHash": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "validationSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["coordinateBasis", "sceneCount", "nodeCount", "primitiveCount", "accessorCount", "bufferCount", "imageCount", "featureCount", "metadataPropertyCount", "featureIdentityModel", "requiredExtensions", "usedExtensions", "validatorName", "validatorVersion", "validatorBuildSha256", "validationHash"],
+      "properties": {
+        "coordinateBasis": {"const": "GLTF_2_0_CONTENT_LOCAL_RIGHT_HANDED"},
+        "sceneCount": {"type": "integer", "minimum": 1},
+        "nodeCount": {"type": "integer", "minimum": 1},
+        "primitiveCount": {"type": "integer", "minimum": 1},
+        "accessorCount": {"type": "integer", "minimum": 1},
+        "bufferCount": {"type": "integer", "minimum": 1},
+        "imageCount": {"type": "integer", "minimum": 0},
+        "featureCount": {"type": "integer", "minimum": 0},
+        "metadataPropertyCount": {"type": "integer", "minimum": 0},
+        "featureIdentityModel": {"enum": ["NONE", "LEGACY_BATCH_TABLE_MAPPED", "ATTRIBUTE_FEATURE_ID_PROPERTY_TABLE", "POINT_FEATURE_ID", "INSTANCE_FEATURE_ID"]},
+        "requiredExtensions": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/nonBlank"}},
+        "usedExtensions": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/nonBlank"}},
+        "validatorName": {"$ref": "#/$defs/nonBlank"},
+        "validatorVersion": {"$ref": "#/$defs/nonBlank"},
+        "validatorBuildSha256": {"$ref": "#/$defs/sha256"},
+        "validationHash": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "outputDeclaration": {
+      "type": "object", "additionalProperties": false,
+      "required": ["outputId", "outputOrdinal", "outputKind", "canonicalFamily", "canonicalContractVersion", "outputSize", "outputSha256", "semanticHash", "validationManifestSha256", "validationSummary"],
+      "properties": {
+        "outputId": {"$ref": "#/$defs/nonBlank"},
+        "outputOrdinal": {"type": "integer", "minimum": 0, "maximum": 1},
+        "outputKind": {"const": "CLIPPED_CANONICAL"},
+        "canonicalFamily": {"$ref": "#/$defs/family"},
+        "canonicalContractVersion": {"$ref": "#/$defs/nonBlank"},
+        "outputSize": {"type": "integer", "minimum": 1},
+        "outputSha256": {"$ref": "#/$defs/sha256"},
+        "semanticHash": {"$ref": "#/$defs/sha256"},
+        "validationManifestSha256": {"$ref": "#/$defs/sha256"},
+        "validationSummary": {"$ref": "#/$defs/validationSummary"}
+      }
+    },
+    "claimRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["messageType", "workerId", "protocolVersion", "schemaSha256", "resourceProfileVersion", "resourceProfileSha256", "familyCapabilities"],
+      "properties": {
+        "messageType": {"const": "CLIPPER_V2_CLAIM_REQUEST"},
+        "workerId": {"$ref": "#/$defs/nonBlank"},
+        "protocolVersion": {"const": "THREE_D_TILES_CLIPPER_V2"},
+        "schemaSha256": {"$ref": "#/$defs/sha256"},
+        "resourceProfileVersion": {"const": "STANDARD_4CPU_8GIB_SINGLE_TASK_V4"},
+        "resourceProfileSha256": {"$ref": "#/$defs/sha256"},
+        "familyCapabilities": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"$ref": "#/$defs/familyCapability"}}
+      }
+    },
+    "claimResponse": {
+      "type": "object", "additionalProperties": false,
+      "required": ["messageType", "workItemId", "attemptId", "requestId", "leaseToken", "leaseExpireTime", "hardDeadlineTime", "tileContentId", "sourceOrdinalPath", "sourceArtifactKind", "sourceArtifactId", "canonicalFamily", "canonicalContractVersion", "clipStrategyVersion", "inputSize", "inputSha256", "inputSemanticHash", "inputValidationManifestSha256", "inputGrant", "scopeWkbBase64", "scopeSrid", "scopeHash", "accumulatedTransform", "transformHash", "canonicalCoordinateBasis", "resourceProfileVersion", "resourceProfileSha256", "limits"],
+      "properties": {
+        "messageType": {"const": "CLIPPER_V2_CLAIM_RESPONSE"},
+        "workItemId": {"$ref": "#/$defs/nonBlank"}, "attemptId": {"$ref": "#/$defs/nonBlank"}, "requestId": {"$ref": "#/$defs/nonBlank"}, "leaseToken": {"$ref": "#/$defs/nonBlank"},
+        "leaseExpireTime": {"$ref": "#/$defs/utc"}, "hardDeadlineTime": {"$ref": "#/$defs/utc"}, "tileContentId": {"$ref": "#/$defs/nonBlank"},
+        "sourceOrdinalPath": {"$ref": "#/$defs/ordinalPath"}, "sourceArtifactKind": {"$ref": "#/$defs/nonBlank"}, "sourceArtifactId": {"$ref": "#/$defs/nonBlank"},
+        "canonicalFamily": {"$ref": "#/$defs/family"}, "canonicalContractVersion": {"$ref": "#/$defs/nonBlank"}, "clipStrategyVersion": {"$ref": "#/$defs/nonBlank"},
+        "inputSize": {"type": "integer", "minimum": 1}, "inputSha256": {"$ref": "#/$defs/sha256"}, "inputSemanticHash": {"$ref": "#/$defs/sha256"}, "inputValidationManifestSha256": {"$ref": "#/$defs/sha256"},
+        "inputGrant": {"$ref": "#/$defs/grant"}, "scopeWkbBase64": {"$ref": "#/$defs/nonBlank"}, "scopeSrid": {"const": 4490}, "scopeHash": {"$ref": "#/$defs/sha256"},
+        "accumulatedTransform": {"type": "array", "minItems": 16, "maxItems": 16, "items": {"type": "number"}}, "transformHash": {"$ref": "#/$defs/sha256"},
+        "canonicalCoordinateBasis": {"const": "GLTF_2_0_CONTENT_LOCAL_RIGHT_HANDED"}, "resourceProfileVersion": {"const": "STANDARD_4CPU_8GIB_SINGLE_TASK_V4"}, "resourceProfileSha256": {"$ref": "#/$defs/sha256"}, "limits": {"$ref": "#/$defs/taskLimits"}
+      }
+    },
+    "heartbeatRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["messageType", "workerId", "attemptId", "requestId", "leaseToken", "phase", "processedBytes"],
+      "properties": {
+        "messageType": {"const": "CLIPPER_V2_HEARTBEAT_REQUEST"}, "workerId": {"$ref": "#/$defs/nonBlank"}, "attemptId": {"$ref": "#/$defs/nonBlank"}, "requestId": {"$ref": "#/$defs/nonBlank"}, "leaseToken": {"$ref": "#/$defs/nonBlank"},
+        "phase": {"enum": ["CLAIMED", "DOWNLOADING", "VERIFYING", "CLASSIFYING", "CLIPPING", "VALIDATING_OUTPUT", "UPLOADING", "COMPLETING"]}, "processedBytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "outputPrepareRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["messageType", "workerId", "attemptId", "requestId", "leaseToken", "output"],
+      "properties": {"messageType": {"const": "CLIPPER_V2_OUTPUT_PREPARE_REQUEST"}, "workerId": {"$ref": "#/$defs/nonBlank"}, "attemptId": {"$ref": "#/$defs/nonBlank"}, "requestId": {"$ref": "#/$defs/nonBlank"}, "leaseToken": {"$ref": "#/$defs/nonBlank"}, "output": {"$ref": "#/$defs/outputDeclaration"}}
+    },
+    "outputPrepareResponse": {
+      "type": "object", "additionalProperties": false,
+      "required": ["messageType", "outputId", "uploadGrantId", "httpMethod", "uploadUrl", "expiresAt"],
+      "properties": {"messageType": {"const": "CLIPPER_V2_OUTPUT_PREPARE_RESPONSE"}, "outputId": {"$ref": "#/$defs/nonBlank"}, "uploadGrantId": {"$ref": "#/$defs/nonBlank"}, "httpMethod": {"const": "PUT"}, "uploadUrl": {"type": "string", "format": "uri", "maxLength": 8192}, "expiresAt": {"$ref": "#/$defs/utc"}}
+    },
+    "outputReportRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["messageType", "workerId", "attemptId", "requestId", "leaseToken", "outputId", "outputEtag", "outputSize", "outputSha256"],
+      "properties": {"messageType": {"const": "CLIPPER_V2_OUTPUT_REPORT_REQUEST"}, "workerId": {"$ref": "#/$defs/nonBlank"}, "attemptId": {"$ref": "#/$defs/nonBlank"}, "requestId": {"$ref": "#/$defs/nonBlank"}, "leaseToken": {"$ref": "#/$defs/nonBlank"}, "outputId": {"$ref": "#/$defs/nonBlank"}, "outputEtag": {"$ref": "#/$defs/nonBlank"}, "outputSize": {"type": "integer", "minimum": 1}, "outputSha256": {"$ref": "#/$defs/sha256"}}
+    },
+    "completeRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["messageType", "workerId", "attemptId", "requestId", "leaseToken", "outcome", "proof", "orderedOutputIds", "outputManifestSha256"],
+      "properties": {"messageType": {"const": "CLIPPER_V2_COMPLETE_REQUEST"}, "workerId": {"$ref": "#/$defs/nonBlank"}, "attemptId": {"$ref": "#/$defs/nonBlank"}, "requestId": {"$ref": "#/$defs/nonBlank"}, "leaseToken": {"$ref": "#/$defs/nonBlank"}, "outcome": {"enum": ["EMPTY", "SAFE_WHOLE", "CLIPPED"]}, "proof": {"$ref": "#/$defs/proof"}, "orderedOutputIds": {"type": "array", "maxItems": 2, "uniqueItems": true, "items": {"$ref": "#/$defs/nonBlank"}}, "outputManifestSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]}}
+    },
+    "failRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["messageType", "workerId", "attemptId", "requestId", "leaseToken", "errorCode", "errorMessage", "retryable"],
+      "properties": {"messageType": {"const": "CLIPPER_V2_FAIL_REQUEST"}, "workerId": {"$ref": "#/$defs/nonBlank"}, "attemptId": {"$ref": "#/$defs/nonBlank"}, "requestId": {"$ref": "#/$defs/nonBlank"}, "leaseToken": {"$ref": "#/$defs/nonBlank"}, "errorCode": {"enum": ["DOWNLOAD_FAILED", "INPUT_IDENTITY_MISMATCH", "INPUT_VALIDATION_FAILED", "CLASSIFICATION_FAILED", "CLIP_FAILED", "OUTPUT_VALIDATION_FAILED", "OUTPUT_UPLOAD_FAILED", "RESOURCE_LIMIT_EXCEEDED", "LEASE_EXPIRED", "ATTEMPTS_EXHAUSTED", "PUBLICATION_IDENTITY_MISMATCH", "INTERNAL_ERROR"]}, "errorMessage": {"type": "string", "minLength": 1, "maxLength": 1024}, "retryable": {"type": "boolean"}}
+    }
+  }
+}
