@@ -129,11 +129,14 @@ QEMU 交叉运行环境。
 3d-tiles-clip-worker --version
 3d-tiles-clip-worker inspect <tile.b3dm>
 3d-tiles-clip-worker run
+3d-tiles-clip-worker run-authorized-clipper
 ```
 
 - `--version`：输出程序版本；
 - `inspect`：严格解析最大 512 MiB 的 B3DM，并输出不含二进制内容和签名 URL 的 JSON 结构摘要；
-- `run`：读取环境变量并启动常驻 Worker。
+- `run`：读取环境变量并启动原有 B3DM 常驻 Worker；
+- `run-authorized-clipper`：启动与原有链路独立的 Clipper V2，只领取已归一化的 canonical
+  Mesh/Point/Instance 内容。该命令默认关闭所有 family，至少需要显式启用一个 family。
 
 Windows Debug 构建示例：
 
@@ -165,6 +168,32 @@ Windows Debug 构建示例：
 `CLIP_WORKER_AUTHORIZATION_HEADER` 是完整 Header，而不是只填写 Token。不要把它写入镜像层、
 README、日志或提交到版本库。
 
+### Clipper V2 运行变量
+
+Clipper V2 使用独立命令和独立控制面身份，默认 Docker `CMD` 不会启动该链路。除下表外，它复用
+Normalizer 的资源配置、validator identity、轮询和 HTTP 超时变量。实例 family 可能输出边界 Mesh，
+因此启用实例时也必须提供 Mesh validator identity。
+
+| 变量 | 是否必填 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `CLIP_WORKER_CLIPPER_V2_CONTROL_PLANE_URL` | 是 | 无 | Clipper V2 控制面基础 URL |
+| `CLIP_WORKER_CLIPPER_V2_ID` | 否 | `HOSTNAME`/`COMPUTERNAME` | Clipper V2 独立 Worker ID |
+| `CLIP_WORKER_CLIPPER_V2_AUTHORIZATION_HEADER` | 否 | 空 | 完整内部鉴权 Header，不记录到日志 |
+| `CLIP_WORKER_CLIPPER_V2_MESH_ENABLED` | 否 | `false` | 领取 canonical Mesh 任务 |
+| `CLIP_WORKER_CLIPPER_V2_POINT_ENABLED` | 否 | `false` | 领取 canonical Point 任务 |
+| `CLIP_WORKER_CLIPPER_V2_INSTANCE_ENABLED` | 否 | `false` | 领取 canonical Instance 任务 |
+| `CLIP_WORKER_NORMALIZER_RESOURCE_PROFILE_PATH` | 否 | 镜像内 V2 profile | Mesh/几何资源限制配置 |
+| `CLIP_WORKER_NORMALIZER_RESOURCE_PROFILE_SHA256` | 是 | 无 | V2 profile 固定摘要 |
+| `CLIP_WORKER_METADATA_RESOURCE_PROFILE_PATH` | 否 | 镜像内 V4 profile | Metadata-safe family 资源限制配置 |
+| `CLIP_WORKER_METADATA_RESOURCE_PROFILE_SHA256` | 是 | 无 | V4 profile 固定摘要，同时随 claim 上报 |
+
+启用 Mesh 或 Instance 时提供 `CLIP_WORKER_NORMALIZER_MESH_VALIDATOR_NAME`、
+`CLIP_WORKER_NORMALIZER_MESH_VALIDATOR_VERSION`、
+`CLIP_WORKER_NORMALIZER_MESH_VALIDATOR_BUILD_SHA256`。启用 Point 时提供对应的
+`...POINT_VALIDATOR_...` 三项；启用 Instance 时还需提供对应的 `...INSTANCE_VALIDATOR_...` 三项。
+轮询及超时继续使用 `CLIP_WORKER_NORMALIZER_POLL_INTERVAL_SECONDS`、
+`CLIP_WORKER_NORMALIZER_API_*` 和 `CLIP_WORKER_NORMALIZER_TRANSFER_*`。
+
 ### Compose 与构建变量
 
 | 变量 | 默认值 | 说明 |
@@ -181,7 +210,7 @@ README、日志或提交到版本库。
 | `CLIP_WORKER_VCPKG_ASSET_PREFIX` | `https://github.com` | vcpkg tool 下载前缀 |
 | `CLIP_WORKER_VCPKG_GITHUB_ASSET_PREFIX` | 空 | GitHub 依赖资产代理前缀 |
 | `CLIP_WORKER_VCPKG_SQLITE_MIRROR_PREFIX` | 空 | SQLite 依赖资产镜像前缀 |
-| `CLIP_WORKER_DEPS_VERSION` | `ubuntu24.04-vcpkg2025.07.25-r2` | 离线依赖版本 |
+| `CLIP_WORKER_DEPS_VERSION` | `ubuntu24.04-vcpkg2025.07.25-r5` | 离线依赖版本 |
 | `CLIP_WORKER_BUILD_BASE_IMAGE` | 带版本和架构的本地镜像 | 离线编译基础镜像 |
 | `CLIP_WORKER_RUNTIME_BASE_IMAGE` | 带版本和架构的本地镜像 | 离线运行基础镜像 |
 

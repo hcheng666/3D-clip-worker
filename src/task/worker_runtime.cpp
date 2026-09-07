@@ -123,6 +123,66 @@ std::string formatErrorCode(formats::FormatErrorCode code) {
         case formats::FormatErrorCode::unsupported_chunk: return "UNSUPPORTED_GLB_CHUNK";
         case formats::FormatErrorCode::unsupported_content: return "UNSUPPORTED_CONTENT";
         case formats::FormatErrorCode::invalid_accessor: return "UNSUPPORTED_ACCESSOR";
+        case formats::FormatErrorCode::compression_draco_invalid:
+            return "COMPRESSION_DRACO_INVALID";
+        case formats::FormatErrorCode::compression_draco_unsupported:
+            return "COMPRESSION_DRACO_UNSUPPORTED";
+        case formats::FormatErrorCode::compression_draco_limit_exceeded:
+            return "COMPRESSION_DRACO_LIMIT_EXCEEDED";
+        case formats::FormatErrorCode::compression_meshopt_invalid:
+            return "COMPRESSION_MESHOPT_INVALID";
+        case formats::FormatErrorCode::compression_meshopt_unsupported:
+            return "COMPRESSION_MESHOPT_UNSUPPORTED";
+        case formats::FormatErrorCode::compression_meshopt_limit_exceeded:
+            return "COMPRESSION_MESHOPT_LIMIT_EXCEEDED";
+        case formats::FormatErrorCode::texture_invalid:
+            return "TEXTURE_DECODE_INVALID";
+        case formats::FormatErrorCode::texture_format_unsupported:
+            return "TEXTURE_FORMAT_UNSUPPORTED";
+        case formats::FormatErrorCode::texture_ktx2_unsupported:
+            return "TEXTURE_KTX2_UNSUPPORTED";
+        case formats::FormatErrorCode::texture_dimension_limit_exceeded:
+            return "TEXTURE_DIMENSION_LIMIT_EXCEEDED";
+        case formats::FormatErrorCode::texture_decoded_bytes_limit_exceeded:
+            return "TEXTURE_DECODED_BYTES_LIMIT_EXCEEDED";
+        case formats::FormatErrorCode::content_primitive_mode_unsupported:
+            return "CONTENT_PRIMITIVE_MODE_UNSUPPORTED";
+        case formats::FormatErrorCode::content_gltf_feature_unsupported:
+            return "CONTENT_GLTF_FEATURE_UNSUPPORTED";
+        case formats::FormatErrorCode::metadata_batch_table_unsupported:
+            return "METADATA_BATCH_TABLE_UNSUPPORTED";
+        case formats::FormatErrorCode::metadata_feature_id_invalid:
+            return "METADATA_FEATURE_ID_INVALID";
+        case formats::FormatErrorCode::metadata_feature_id_texture_unsupported:
+            return "METADATA_FEATURE_ID_TEXTURE_UNSUPPORTED";
+        case formats::FormatErrorCode::metadata_feature_id_triangle_ambiguous:
+            return "METADATA_FEATURE_ID_TRIANGLE_AMBIGUOUS";
+        case formats::FormatErrorCode::metadata_property_table_invalid:
+            return "METADATA_PROPERTY_TABLE_INVALID";
+        case formats::FormatErrorCode::metadata_property_type_unsupported:
+            return "METADATA_PROPERTY_TYPE_UNSUPPORTED";
+        case formats::FormatErrorCode::metadata_property_attribute_unsupported:
+            return "METADATA_PROPERTY_ATTRIBUTE_UNSUPPORTED";
+        case formats::FormatErrorCode::metadata_property_texture_unsupported:
+            return "METADATA_PROPERTY_TEXTURE_UNSUPPORTED";
+        case formats::FormatErrorCode::metadata_hierarchy_invalid:
+            return "METADATA_HIERARCHY_INVALID";
+        case formats::FormatErrorCode::metadata_hierarchy_unsupported:
+            return "METADATA_HIERARCHY_UNSUPPORTED";
+        case formats::FormatErrorCode::metadata_relationship_unsupported:
+            return "METADATA_RELATIONSHIP_UNSUPPORTED";
+        case formats::FormatErrorCode::metadata_statistics_unsupported:
+            return "METADATA_STATISTICS_UNSUPPORTED";
+        case formats::FormatErrorCode::metadata_unknown_required_extension:
+            return "METADATA_UNKNOWN_REQUIRED_EXTENSION";
+        case formats::FormatErrorCode::metadata_reconstruction_unsafe:
+            return "METADATA_RECONSTRUCTION_UNSAFE";
+        case formats::FormatErrorCode::metadata_leakage_verification_failed:
+            return "METADATA_LEAKAGE_VERIFICATION_FAILED";
+        case formats::FormatErrorCode::normalization_output_invalid:
+            return "NORMALIZATION_OUTPUT_INVALID";
+        case formats::FormatErrorCode::clipping_output_invalid:
+            return "CLIPPING_OUTPUT_INVALID";
         default: return "UNSUPPORTED_INVALID_CONTENT";
     }
 }

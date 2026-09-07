@@ -1,0 +1,8 @@
+{
+  "asset": {"version": "2.0"},
+  "extensionsUsed": ["VENDOR_unknown_required"],
+  "extensionsRequired": ["VENDOR_unknown_required"],
+  "extensions": {"VENDOR_unknown_required": {"payload": "must-not-be-ignored"}},
+  "scene": 0,
+  "scenes": [{"nodes": []}]
+}

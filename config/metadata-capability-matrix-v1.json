@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "matrixVersion": "THREE_D_TILES_METADATA_CAPABILITY_MATRIX_V1",
+  "description": "Executable metadata normalization and authorization boundary policy. Unsupported rows must fail closed without copying source metadata.",
+  "entries": [
+    {
+      "sourceModel": "NO_FEATURE_METADATA",
+      "normalization": "SUPPORTED",
+      "boundaryRebuild": "SUPPORTED",
+      "reasonCode": "CLIPPING_STRATEGY_UNSUPPORTED",
+      "featureIdentity": "NONE"
+    },
+    {
+      "sourceModel": "LEGACY_BATCH_TABLE_JSON",
+      "normalization": "SUPPORTED",
+      "boundaryRebuild": "SUPPORTED",
+      "reasonCode": "CLIPPING_STRATEGY_UNSUPPORTED",
+      "featureIdentity": "LEGACY_BATCH_TABLE_MAPPED",
+      "propertyTypes": ["BOOLEAN", "FLOAT64", "STRING"]
+    },
+    {
+      "sourceModel": "LEGACY_BATCH_TABLE_BINARY",
+      "normalization": "SUPPORTED",
+      "boundaryRebuild": "SUPPORTED",
+      "reasonCode": "CLIPPING_STRATEGY_UNSUPPORTED",
+      "featureIdentity": "LEGACY_BATCH_TABLE_MAPPED",
+      "componentTypes": ["INT8", "UINT8", "INT16", "UINT16", "INT32", "UINT32", "FLOAT32", "FLOAT64"],
+      "propertyTypes": ["SCALAR", "VEC2", "VEC3", "VEC4"]
+    },
+    {
+      "sourceModel": "LEGACY_BATCH_TABLE_HIERARCHY",
+      "normalization": "SUPPORTED",
+      "boundaryRebuild": "SUPPORTED",
+      "reasonCode": "CLIPPING_STRATEGY_UNSUPPORTED",
+      "featureIdentity": "LEGACY_BATCH_TABLE_MAPPED",
+      "requirements": ["ACYCLIC_GRAPH", "ANCESTOR_CLOSURE", "DENSE_REFERENCE_REWRITE"]
+    },
+    {
+      "sourceModel": "ATTRIBUTE_FEATURE_ID_PROPERTY_TABLE",
+      "normalization": "SUPPORTED",
+      "boundaryRebuild": "SUPPORTED",
+      "reasonCode": "CLIPPING_STRATEGY_UNSUPPORTED",
+      "featureIdentity": "ATTRIBUTE_FEATURE_ID_PROPERTY_TABLE",
+      "componentTypes": ["INT8", "UINT8", "INT16", "UINT16", "INT32", "UINT32", "FLOAT32", "FLOAT64"],
+      "propertyTypes": ["SCALAR", "VEC2", "VEC3", "VEC4", "BOOLEAN", "STRING", "ENUM", "FIXED_ARRAY", "VARIABLE_ARRAY"]
+    },
+    {
+      "sourceModel": "IMPLICIT_FEATURE_ID_PROPERTY_TABLE",
+      "normalization": "SUPPORTED",
+      "boundaryRebuild": "SUPPORTED",
+      "reasonCode": "CLIPPING_STRATEGY_UNSUPPORTED",
+      "featureIdentity": "IMPLICIT_FEATURE_ID_PROPERTY_TABLE"
+    },
+    {
+      "sourceModel": "MULTIPLE_ATTRIBUTE_OR_IMPLICIT_FEATURE_ID_SETS",
+      "normalization": "SUPPORTED",
+      "boundaryRebuild": "SUPPORTED",
+      "reasonCode": "CLIPPING_STRATEGY_UNSUPPORTED",
+      "featureIdentity": "MULTIPLE_FEATURE_ID_SETS"
+    },
+    {
+      "sourceModel": "FEATURE_ID_TEXTURE",
+      "normalization": "DEFERRED",
+      "boundaryRebuild": "GLOBAL_PREVIEW_ONLY",
+      "reasonCode": "METADATA_FEATURE_ID_TEXTURE_UNSUPPORTED"
+    },
+    {
+      "sourceModel": "PROPERTY_TEXTURE",
+      "normalization": "DEFERRED",
+      "boundaryRebuild": "GLOBAL_PREVIEW_ONLY",
+      "reasonCode": "METADATA_PROPERTY_TEXTURE_UNSUPPORTED"
+    },
+    {
+      "sourceModel": "PROPERTY_ATTRIBUTE",
+      "normalization": "DEFERRED",
+      "boundaryRebuild": "GLOBAL_PREVIEW_ONLY",
+      "reasonCode": "METADATA_PROPERTY_ATTRIBUTE_UNSUPPORTED"
+    },
+    {
+      "sourceModel": "INT64_UINT64_OR_MATRIX_PROPERTY",
+      "normalization": "DEFERRED",
+      "boundaryRebuild": "GLOBAL_PREVIEW_ONLY",
+      "reasonCode": "METADATA_PROPERTY_TYPE_UNSUPPORTED"
+    },
+    {
+      "sourceModel": "UNKNOWN_MODERN_HIERARCHY_OR_RELATIONSHIP",
+      "normalization": "DEFERRED",
+      "boundaryRebuild": "GLOBAL_PREVIEW_ONLY",
+      "reasonCode": "METADATA_RELATIONSHIP_UNSUPPORTED"
+    },
+    {
+      "sourceModel": "ROOT_STATISTICS_OR_CUSTOM_AGGREGATE",
+      "normalization": "DEFERRED",
+      "boundaryRebuild": "GLOBAL_PREVIEW_ONLY",
+      "reasonCode": "METADATA_STATISTICS_UNSUPPORTED"
+    },
+    {
+      "sourceModel": "UNKNOWN_REQUIRED_METADATA_EXTENSION",
+      "normalization": "DEFERRED",
+      "boundaryRebuild": "GLOBAL_PREVIEW_ONLY",
+      "reasonCode": "METADATA_UNKNOWN_REQUIRED_EXTENSION"
+    },
+    {
+      "sourceModel": "RECOGNIZED_BUT_UNSAFE_TO_RECONSTRUCT",
+      "normalization": "DEFERRED",
+      "boundaryRebuild": "GLOBAL_PREVIEW_ONLY",
+      "reasonCode": "METADATA_RECONSTRUCTION_UNSAFE"
+    }
+  ]
+}

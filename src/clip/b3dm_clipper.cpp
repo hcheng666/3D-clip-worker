@@ -7,6 +7,7 @@
 #include "clip_worker/geometry/authorization_scope.hpp"
 #include "clip_worker/geometry/clip_geometry.hpp"
 #include "clip_worker/geometry/matrix4.hpp"
+#include "clip_worker/mesh/mesh_scene.hpp"
 
 #include <algorithm>
 #include <array>
@@ -645,6 +646,7 @@ struct VertexLayout {
 };
 struct PrimitiveOutput {
     Json json; std::optional<std::size_t> source_material; std::map<std::size_t, std::vector<MaskUse>> image_uses;
+    mesh::MeshPrimitive primitive;
     std::uint64_t input_vertices = 0U; std::uint64_t input_triangles = 0U; std::uint64_t output_vertices = 0U; std::uint64_t output_triangles = 0U;
 };
 
@@ -663,17 +665,17 @@ ClipVertex makeVertex(std::uint32_t index, const std::vector<double>& positions,
 }
 
 void appendFragment(const ClippedTriangle& fragment, const VertexLayout& layout,
-                    std::vector<float>& positions, std::vector<float>& uv,
-                    std::vector<float>& normals, std::vector<float>& colors) {
+                    mesh::MeshPrimitive& primitive) {
     for (const auto& vertex : fragment) {
-        for (const double value : vertex.local_position) { positions.push_back(static_cast<float>(value)); }
-        if (layout.has_uv) { uv.push_back(static_cast<float>(vertex.attributes[layout.uv_offset])); uv.push_back(static_cast<float>(vertex.attributes[layout.uv_offset + 1U])); }
+        for (const double value : vertex.local_position) { primitive.positions.push_back(static_cast<float>(value)); }
+        if (layout.has_uv) { primitive.texcoords_0.push_back(static_cast<float>(vertex.attributes[layout.uv_offset])); primitive.texcoords_0.push_back(static_cast<float>(vertex.attributes[layout.uv_offset + 1U])); }
         if (layout.has_normal) {
             const double x = vertex.attributes[layout.normal_offset], y = vertex.attributes[layout.normal_offset + 1U], z = vertex.attributes[layout.normal_offset + 2U];
             const double length = std::sqrt(x * x + y * y + z * z); if (length <= 1.0e-15) { unsupported("Interpolated normal has zero length"); }
-            normals.push_back(static_cast<float>(x / length)); normals.push_back(static_cast<float>(y / length)); normals.push_back(static_cast<float>(z / length));
+            primitive.normals.push_back(static_cast<float>(x / length)); primitive.normals.push_back(static_cast<float>(y / length)); primitive.normals.push_back(static_cast<float>(z / length));
         }
-        if (layout.has_color) { for (std::size_t component = 0; component < layout.color_components; ++component) { colors.push_back(static_cast<float>(vertex.attributes[layout.color_offset + component])); } }
+        if (layout.has_color) { for (std::size_t component = 0; component < layout.color_components; ++component) { primitive.colors.push_back(static_cast<float>(vertex.attributes[layout.color_offset + component])); } }
+        primitive.indices.push_back(static_cast<std::uint32_t>(primitive.indices.size()));
     }
 }
 
@@ -853,23 +855,25 @@ PrimitiveOutput processPrimitive(const GlbSource& source, const Json& primitive,
     else { indices.resize(vertex_count); for (std::size_t index = 0; index < vertex_count; ++index) { indices[index] = static_cast<std::uint32_t>(index); } }
     if (indices.empty() || indices.size() % 3U != 0U || std::any_of(indices.begin(), indices.end(), [vertex_count](std::uint32_t value) { return value >= vertex_count; })) { invalidAccessor("Primitive triangle indices are invalid"); }
     PrimitiveOutput result; result.input_vertices = vertex_count; result.input_triangles = indices.size() / 3U;
+    result.primitive.color_components = static_cast<std::uint32_t>(layout.color_components);
     std::optional<std::size_t> texture_index;
     if (primitive.contains("material")) { result.source_material = checkedSize(primitive, "material"); texture_index = materials.material(*result.source_material).texture; if (texture_index.has_value() && !layout.has_uv) { unsupported("Textured primitive is missing TEXCOORD_0"); } }
-    std::vector<float> output_positions, output_uv, output_normals, output_colors; std::vector<std::array<Point2, 3>> retained_uv; geometry::AuthorizationTriangleIndex::QueryWorkspace scope_query_workspace;
+    std::vector<std::array<Point2, 3>> retained_uv; geometry::AuthorizationTriangleIndex::QueryWorkspace scope_query_workspace;
     for (std::size_t index = 0; index < indices.size(); index += 3U) {
         const ClippedTriangle triangle{makeVertex(indices[index], positions, uv, normals, colors, layout, world_transform, scope), makeVertex(indices[index + 1U], positions, uv, normals, colors, layout, world_transform, scope), makeVertex(indices[index + 2U], positions, uv, normals, colors, layout, world_transform, scope)};
         scope.queryTriangles(triangle, scope_query_workspace);
         for (const auto& fragment : geometry::TriangleClipper::clip(triangle, scope_query_workspace.triangles)) {
-            appendFragment(fragment, layout, output_positions, output_uv, output_normals, output_colors);
+            appendFragment(fragment, layout, result.primitive);
             if (texture_index.has_value()) { retained_uv.push_back({Point2{fragment[0].attributes[layout.uv_offset], fragment[0].attributes[layout.uv_offset + 1U]}, Point2{fragment[1].attributes[layout.uv_offset], fragment[1].attributes[layout.uv_offset + 1U]}, Point2{fragment[2].attributes[layout.uv_offset], fragment[2].attributes[layout.uv_offset + 1U]}}); }
         }
     }
-    if (output_positions.empty()) { return result; }
-    result.output_vertices = output_positions.size() / 3U; result.output_triangles = result.output_vertices / 3U; result.json["mode"] = kGlTriangles;
-    result.json["attributes"]["POSITION"] = output_buffer.addFloatAccessor(output_positions, 3U, "VEC3", true);
-    if (layout.has_uv) { result.json["attributes"]["TEXCOORD_0"] = output_buffer.addFloatAccessor(output_uv, 2U, "VEC2", false); }
-    if (layout.has_normal) { result.json["attributes"]["NORMAL"] = output_buffer.addFloatAccessor(output_normals, 3U, "VEC3", false); }
-    if (layout.has_color) { result.json["attributes"]["COLOR_0"] = output_buffer.addFloatAccessor(output_colors, layout.color_components, layout.color_components == 4U ? "VEC4" : "VEC3", false); }
+    if (result.primitive.positions.empty()) { return result; }
+    mesh::validateMeshPrimitive(result.primitive);
+    result.output_vertices = result.primitive.vertexCount(); result.output_triangles = result.primitive.triangleCount(); result.json["mode"] = kGlTriangles;
+    result.json["attributes"]["POSITION"] = output_buffer.addFloatAccessor(result.primitive.positions, 3U, "VEC3", true);
+    if (layout.has_uv) { result.json["attributes"]["TEXCOORD_0"] = output_buffer.addFloatAccessor(result.primitive.texcoords_0, 2U, "VEC2", false); }
+    if (layout.has_normal) { result.json["attributes"]["NORMAL"] = output_buffer.addFloatAccessor(result.primitive.normals, 3U, "VEC3", false); }
+    if (layout.has_color) { result.json["attributes"]["COLOR_0"] = output_buffer.addFloatAccessor(result.primitive.colors, layout.color_components, layout.color_components == 4U ? "VEC4" : "VEC3", false); }
     if (texture_index.has_value()) { const auto& texture = materials.texture(*texture_index); const auto& sampler = materials.sampler(texture.sampler); auto& uses = result.image_uses[texture.image]; for (const auto& triangle : retained_uv) { uses.push_back({triangle, sampler}); } }
     return result;
 }
@@ -1096,24 +1100,14 @@ std::optional<std::array<double, 3>> rtcCenter(const Json& feature_table) {
     return numberArray<3U>(feature_table.at("RTC_CENTER"), "RTC_CENTER");
 }
 
-Matrix4 upAxisTransform(task::GltfUpAxis axis) {
+mesh::UpAxis meshUpAxis(task::GltfUpAxis axis) {
     switch (axis) {
         case task::GltfUpAxis::x:
-            // X-up to Z-up: (x, y, z) -> (-z, y, x).
-            return Matrix4::fromColumnMajor({
-                    0.0, 0.0, 1.0, 0.0,
-                    0.0, 1.0, 0.0, 0.0,
-                    -1.0, 0.0, 0.0, 0.0,
-                    0.0, 0.0, 0.0, 1.0});
+            return mesh::UpAxis::x;
         case task::GltfUpAxis::y:
-            // Standard glTF Y-up to 3D Tiles Z-up: (x, y, z) -> (x, -z, y).
-            return Matrix4::fromColumnMajor({
-                    1.0, 0.0, 0.0, 0.0,
-                    0.0, 0.0, 1.0, 0.0,
-                    0.0, -1.0, 0.0, 0.0,
-                    0.0, 0.0, 0.0, 1.0});
+            return mesh::UpAxis::y;
         case task::GltfUpAxis::z:
-            return Matrix4::identity();
+            return mesh::UpAxis::z;
     }
     throw std::invalid_argument("Unknown glTF up axis enum value");
 }
@@ -1200,7 +1194,8 @@ B3dmClipResult B3dmClipper::clip(
         const Matrix4 content_transform = rtc_center.has_value()
                 ? tile_transform * Matrix4::translation(*rtc_center)
                 : tile_transform;
-        const Matrix4 axis_transform = upAxisTransform(task.gltf_up_axis);
+        const Matrix4 axis_transform = mesh::upAxisToZTransform(
+                meshUpAxis(task.gltf_up_axis));
         const SceneTransforms transforms = sceneTransforms(source);
         MaterialCatalog materials(source);
         BufferBuilder output_buffer;

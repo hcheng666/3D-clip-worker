@@ -1,0 +1,155 @@
+{
+  "claimRequest": {
+    "messageType": "CLAIM_REQUEST",
+    "workerId": "worker-1",
+    "protocolVersion": "THREE_D_TILES_NORMALIZER_V1",
+    "schemaSha256": "f9adef70706c010979e0bc65306cee9692af338941e13a0a554fe6879d6319c6",
+    "decoderCapabilities": ["DRACO", "JPEG", "KTX2", "MESHOPT", "PNG", "WEBP"],
+    "supportedNormalizationVersions": ["normalization-v1"],
+    "familyCapabilities": [{
+      "canonicalFamily": "MESH_GLTF2",
+      "canonicalContractVersion": "canonical-gltf2-v1",
+      "validatorName": "SYNTHETIC_GLTF_VALIDATOR",
+      "validatorVersion": "1.0.0",
+      "validatorBuildSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "maximumInputBytes": 4294967296,
+      "maximumOutputBytes": 4294967296
+    }],
+    "resourceProfileVersion": "STANDARD_4CPU_8GIB_SINGLE_TASK_V1",
+    "resourceProfileSha256": "a65be19950a48f15c9a0275dda5a0b8b8e9e309feab84cbc10584dd70713c093",
+    "toolVersions": [{
+      "name": "SYNTHETIC_GLTF_VALIDATOR",
+      "version": "1.0.0",
+      "buildSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }]
+  },
+  "claimResponse": {
+    "messageType": "CLAIM_RESPONSE",
+    "taskId": "task-1",
+    "attemptId": "attempt-1",
+    "requestId": "request-1",
+    "leaseToken": "lease-1",
+    "leaseExpireTime": "2026-08-22T01:02:00Z",
+    "hardDeadlineTime": "2026-08-22T01:15:00Z",
+    "tileContentId": "content-1",
+    "sourceClosureHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "resourceClosureVersion": "CONTENT_RESOURCE_CLOSURE_V1",
+    "normalizationVersion": "normalization-v1",
+    "canonicalFamily": "MESH_GLTF2",
+    "canonicalContractVersion": "canonical-gltf2-v1",
+    "resourceProfileVersion": "STANDARD_4CPU_8GIB_SINGLE_TASK_V1",
+    "resourceProfileSha256": "a65be19950a48f15c9a0275dda5a0b8b8e9e309feab84cbc10584dd70713c093",
+    "requiredDecoders": [],
+    "resourceManifest": {
+      "manifestVersion": "NORMALIZATION_RESOURCE_MANIFEST_V1",
+      "manifestId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "pageCount": 1,
+      "pageSize": 1000,
+      "recordCount": 1,
+      "manifestSha256": "fe61596332b3a963453dca49dd12d53fda4bb9e9c33484c8324e4c4775fdf906"
+    }
+  },
+  "resourceManifestPage": {
+    "messageType": "RESOURCE_MANIFEST_PAGE",
+    "manifestId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "pageNumber": 1,
+    "recordCount": 1,
+    "pageSha256": "00a58594c15d16d304ffe3478abed39e9f085b84eea476e737acecc9af440e96",
+    "records": [{
+      "objectId": "resource-1",
+      "packageRelativePath": "content.glb",
+      "resourceRole": "CONTENT",
+      "detectedKind": "GLB",
+      "detectedVersion": "2.0",
+      "mediaType": "model/gltf-binary",
+      "size": 344,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "requiredExtensions": [],
+      "usedExtensions": [],
+      "dependencyIds": [],
+      "accessGrant": {
+        "grantId": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "httpMethod": "GET",
+        "url": "https://metadata.invalid/api/internal/three-d-tiles/normalization-grants/resource?token=opaque",
+        "expiresAt": "2026-08-22T01:02:00Z"
+      }
+    }]
+  },
+  "heartbeatRequest": {
+    "messageType": "HEARTBEAT_REQUEST",
+    "workerId": "worker-1",
+    "leaseToken": "lease-1",
+    "requestId": "request-1",
+    "phase": "VALIDATE",
+    "totalResources": 1,
+    "processedResources": 1
+  },
+  "heartbeatResponse": {
+    "messageType": "HEARTBEAT_RESPONSE",
+    "leaseExpireTime": "2026-08-22T01:03:00Z",
+    "hardDeadlineTime": "2026-08-22T01:15:00Z",
+    "cancelRequested": false
+  },
+  "uploadPrepareRequest": {
+    "messageType": "UPLOAD_PREPARE_REQUEST",
+    "workerId": "worker-1",
+    "leaseToken": "lease-1",
+    "requestId": "request-1",
+    "canonicalFamily": "MESH_GLTF2",
+    "canonicalContractVersion": "canonical-gltf2-v1",
+    "outputSize": 396,
+    "outputSha256": "446bfc4170db358bac35ce93548e7da735557f74ec9792797225f6935455094d",
+    "semanticHash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "validationManifestSha256": "e685490ad007476aba03b5f4b38295bf71d8f2bde4fe7834411bafe666e70bff",
+    "validationSummary": {
+      "coordinateBasis": "GLTF_2_0_CONTENT_LOCAL_RIGHT_HANDED",
+      "sceneCount": 1,
+      "nodeCount": 1,
+      "primitiveCount": 1,
+      "accessorCount": 1,
+      "bufferCount": 1,
+      "imageCount": 0,
+      "featureCount": 0,
+      "metadataPropertyCount": 0,
+      "featureIdentityModel": "NONE",
+      "requiredExtensions": [],
+      "usedExtensions": [],
+      "validatorName": "SYNTHETIC_GLTF_VALIDATOR",
+      "validatorVersion": "1.0.0",
+      "validatorBuildSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "validationHash": "6b1f679ccd1fbd81cea51d572213fe0d87e1ceedfb94df9c65d4fdc67d07847c"
+    }
+  },
+  "uploadPrepareResponse": {
+    "messageType": "UPLOAD_PREPARE_RESPONSE",
+    "uploadGrantId": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "httpMethod": "PUT",
+    "uploadUrl": "https://object.invalid/exact-attempt-object?opaque=1",
+    "expiresAt": "2026-08-22T01:04:00Z"
+  },
+  "uploadReportRequest": {
+    "messageType": "UPLOAD_REPORT_REQUEST",
+    "workerId": "worker-1",
+    "leaseToken": "lease-1",
+    "requestId": "request-1",
+    "outputEtag": "etag-1",
+    "outputSize": 396,
+    "outputSha256": "446bfc4170db358bac35ce93548e7da735557f74ec9792797225f6935455094d"
+  },
+  "completeRequest": {
+    "messageType": "COMPLETE_REQUEST",
+    "workerId": "worker-1",
+    "leaseToken": "lease-1",
+    "requestId": "request-1"
+  },
+  "failRequest": {
+    "messageType": "FAIL_REQUEST",
+    "workerId": "worker-1",
+    "leaseToken": "lease-1",
+    "requestId": "request-1",
+    "errorCode": "CANONICAL_OUTPUT_INVALID",
+    "errorMessage": "canonical artifact failed local validation",
+    "retryable": false,
+    "unsupported": false
+  }
+}

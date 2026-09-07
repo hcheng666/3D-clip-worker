@@ -1,0 +1,39 @@
+{
+  "unsupportedProtocolClaim": {
+    "messageType": "CLAIM_REQUEST",
+    "workerId": "worker-1",
+    "protocolVersion": "THREE_D_TILES_NORMALIZER_V2",
+    "schemaSha256": "f9adef70706c010979e0bc65306cee9692af338941e13a0a554fe6879d6319c6",
+    "supportedNormalizationVersions": ["normalization-v1"],
+    "familyCapabilities": [],
+    "resourceProfileVersion": "STANDARD_4CPU_8GIB_SINGLE_TASK_V1",
+    "resourceProfileSha256": "a65be19950a48f15c9a0275dda5a0b8b8e9e309feab84cbc10584dd70713c093",
+    "toolVersions": []
+  },
+  "hashMismatchManifestPage": {
+    "messageType": "RESOURCE_MANIFEST_PAGE",
+    "manifestId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "pageNumber": 1,
+    "recordCount": 1,
+    "pageSha256": "9999999999999999999999999999999999999999999999999999999999999999",
+    "records": []
+  },
+  "credentialBearingClaimResponse": {
+    "messageType": "CLAIM_RESPONSE",
+    "taskId": "task-1",
+    "attemptId": "attempt-1",
+    "requestId": "request-1",
+    "leaseToken": "lease-1",
+    "bucketName": "must-not-exist"
+  },
+  "unsafeFailure": {
+    "messageType": "FAIL_REQUEST",
+    "workerId": "worker-1",
+    "leaseToken": "lease-1",
+    "requestId": "request-1",
+    "errorCode": "INTERNAL_FAILURE",
+    "errorMessage": "https://object.invalid/path?token=secret",
+    "retryable": true,
+    "unsupported": false
+  }
+}

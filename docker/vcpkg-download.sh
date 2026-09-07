@@ -4,7 +4,7 @@ set -eu
 source_url="$1"
 destination="$2"
 connect_timeout_seconds="${VCPKG_DOWNLOAD_CONNECT_TIMEOUT_SECONDS:-15}"
-max_time_seconds="${VCPKG_DOWNLOAD_MAX_TIME_SECONDS:-300}"
+max_time_seconds="${VCPKG_DOWNLOAD_MAX_TIME_SECONDS:-3600}"
 
 case "${source_url}" in
     https://github.com/*|https://raw.githubusercontent.com/*)

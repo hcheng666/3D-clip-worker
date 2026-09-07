@@ -22,5 +22,13 @@ TEST(ObjectTransferTest, ReportsCurlReasonWithoutExposingPresignedUrl) {
     }
 }
 
+TEST(ObjectTransferTest, StopsAStreamBeforeOpeningTheRemoteRequest) {
+    const ObjectTransfer transfer;
+    EXPECT_THROW(static_cast<void>(transfer.inspect(
+                         "https://signed.example.invalid/private/object",
+                         1024U, [] { return false; })),
+                 ObjectTransferCancelledError);
+}
+
 }  // namespace
 }  // namespace clip_worker::client

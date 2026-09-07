@@ -1,0 +1,118 @@
+{
+  "benchmarkVersion": "resource-limit-scaling-v1",
+  "candidateUriDepth": 32,
+  "clipping": [
+    {
+      "medianMs": 117.064,
+      "peakPythonBytes": 5360,
+      "result": 38216,
+      "scale": 10000,
+      "unit": "triangles"
+    },
+    {
+      "medianMs": 1184.072,
+      "peakPythonBytes": 792,
+      "result": 382177,
+      "scale": 100000,
+      "unit": "triangles"
+    },
+    {
+      "medianMs": 6099.551,
+      "peakPythonBytes": 792,
+      "result": 1910895,
+      "scale": 500000,
+      "unit": "triangles"
+    }
+  ],
+  "environment": {
+    "note": "Python scaling harness; native Worker CI benchmark remains required",
+    "pillow": "12.3.0",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.12.13"
+  },
+  "inspection": [
+    {
+      "compressedBytes": 172913,
+      "medianMs": 41.364,
+      "peakPythonBytes": 1074295,
+      "result": {
+        "entries": 1000,
+        "expandedBytes": 128000,
+        "maximumPathDepth": 3
+      },
+      "scale": 1000,
+      "unit": "entries"
+    },
+    {
+      "compressedBytes": 1728828,
+      "medianMs": 408.306,
+      "peakPythonBytes": 6955149,
+      "result": {
+        "entries": 10000,
+        "expandedBytes": 1280000,
+        "maximumPathDepth": 3
+      },
+      "scale": 10000,
+      "unit": "entries"
+    },
+    {
+      "compressedBytes": 8644238,
+      "medianMs": 2199.847,
+      "peakPythonBytes": 32830909,
+      "result": {
+        "entries": 50000,
+        "expandedBytes": 6400000,
+        "maximumPathDepth": 3
+      },
+      "scale": 50000,
+      "unit": "entries"
+    }
+  ],
+  "normalization": [
+    {
+      "medianMs": 67.929,
+      "peakPythonBytes": 2125275,
+      "result": "7881f6cf7d43a0bdc94feb64ec3644396a419dfce7e8f6a6fad23d3655384827",
+      "scale": 10000,
+      "unit": "resources"
+    },
+    {
+      "medianMs": 353.341,
+      "peakPythonBytes": 10532587,
+      "result": "6caeb1f18f1545961c5fdb781b6f1c249eba2074e3b2e405eacd29e8d9cffc35",
+      "scale": 50000,
+      "unit": "resources"
+    },
+    {
+      "medianMs": 706.946,
+      "peakPythonBytes": 21089155,
+      "result": "c5584f15a3a26c6953df2a19484e4167c59eb2d89b19f801155b3723b78af222",
+      "scale": 100000,
+      "unit": "resources"
+    }
+  ],
+  "schemaVersion": 1,
+  "texture": [
+    {
+      "medianMs": 1178.542,
+      "peakPythonBytes": 5486261,
+      "result": 4528,
+      "scale": 512,
+      "unit": "pixelsPerAxis"
+    },
+    {
+      "medianMs": 4501.882,
+      "peakPythonBytes": 16798162,
+      "result": 11252,
+      "scale": 1024,
+      "unit": "pixelsPerAxis"
+    },
+    {
+      "medianMs": 18489.66,
+      "peakPythonBytes": 67173464,
+      "result": 31626,
+      "scale": 2048,
+      "unit": "pixelsPerAxis"
+    }
+  ]
+}

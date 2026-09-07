@@ -3,4 +3,5 @@ build
 out
 vcpkg_installed
 offline-bundles
+tests/corpus/.cache
 *.log

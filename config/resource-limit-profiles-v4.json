@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 4,
+  "defaultProfile": "STANDARD_4CPU_8GIB_SINGLE_TASK_V4",
+  "profiles": [
+    {
+      "id": "STANDARD_4CPU_8GIB_SINGLE_TASK_V4",
+      "description": "Metadata-safe mesh, point, instance, and recursive composite normalization limits for one 4 vCPU / 8 GiB worker task.",
+      "point": {
+        "maximumPoints": 10000000,
+        "maximumDecodedBytes": 1073741824
+      },
+      "instance": {
+        "maximumInstances": 250000,
+        "maximumDecodedBytes": 1073741824,
+        "maximumExpandedVertices": 5000000,
+        "maximumExpandedIndices": 6000000,
+        "maximumBoundaryInstances": 250000
+      },
+      "composite": {
+        "maximumDepth": 8,
+        "maximumChildren": 1024,
+        "maximumOutputs": 1025
+      },
+      "metadata": {
+        "maximumFeatureRows": 10000000,
+        "maximumProperties": 4096,
+        "maximumStringBytes": 67108864,
+        "maximumBinaryBytes": 268435456,
+        "maximumSchemaBytes": 4194304,
+        "maximumClasses": 4096,
+        "maximumEnums": 4096,
+        "maximumPropertyTables": 1024,
+        "maximumFeatureIdSets": 1024,
+        "maximumValuesBytes": 268435456,
+        "maximumArrayOffsetBytes": 67108864,
+        "maximumStringOffsetBytes": 67108864,
+        "maximumDecodedStringBytes": 67108864,
+        "maximumArrayElements": 20000000,
+        "maximumHierarchyInstances": 10000000,
+        "maximumHierarchyEdges": 20000000,
+        "maximumHierarchyDepth": 256,
+        "maximumAncestorClosureEntries": 20000000,
+        "maximumFeatureMappingEntries": 20000000,
+        "maximumValidationOperations": 100000000
+      },
+      "policy": {
+        "limitFailureMode": "FAIL_CLOSED",
+        "meshNormalizationVersion": "normalization-mesh-metadata-v1",
+        "meshCanonicalContractVersion": "canonical-mesh-metadata-gltf2-v1",
+        "pointNormalizationVersion": "normalization-point-metadata-v1",
+        "pointCanonicalContractVersion": "canonical-point-metadata-gltf2-v1",
+        "instanceNormalizationVersion": "normalization-instance-metadata-v1",
+        "instanceCanonicalContractVersion": "canonical-instance-metadata-gltf2-v1",
+        "compositeNormalizationVersion": "normalization-composite-metadata-v1",
+        "compositeCanonicalContractVersion": "canonical-composite-children-metadata-v1"
+      }
+    }
+  ]
+}

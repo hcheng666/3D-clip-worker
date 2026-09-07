@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "generatorVersion": "normalizer-canonical-fixture-v1",
+  "files": [
+    {
+      "path": "mesh-positive.glb",
+      "size": 396,
+      "sha256": "446bfc4170db358bac35ce93548e7da735557f74ec9792797225f6935455094d"
+    },
+    {
+      "path": "point-positive.glb",
+      "size": 372,
+      "sha256": "19e333311a74c3c99ec55bff115f3b74761bad7a3c0e09e11c5c2fa0807fd0c9"
+    },
+    {
+      "path": "instance-positive.glb",
+      "size": 564,
+      "sha256": "b33a65fd0a000d9f39a2239686967342d3bc9b9f8e264145987f1defac857032"
+    },
+    {
+      "path": "external-uri-negative.glb",
+      "size": 416,
+      "sha256": "28ec11075c01e1df89627f172dba74e0d86f2e0a23a55375732cb348a95ec2ed"
+    },
+    {
+      "path": "unknown-required-extension-negative.glb",
+      "size": 488,
+      "sha256": "ed9de363907f466f0f7151718c3edacfb13aeaae7aae85b3e49cdfa3276c983f"
+    },
+    {
+      "path": "bad-length-negative.glb",
+      "size": 396,
+      "sha256": "bcb61f91b0298f146603950ca075487478aaf02fc815cbfeba7bf8cfa7c3d9cf"
+    }
+  ]
+}

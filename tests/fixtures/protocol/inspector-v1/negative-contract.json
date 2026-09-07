@@ -1,0 +1,97 @@
+{
+  "unsupportedProtocolRequest": {
+    "messageType": "INSPECTION_REQUEST",
+    "protocolVersion": "THREE_D_TILES_INSPECTOR_V2",
+    "inspectionId": "inspection-1",
+    "requestId": "request-1",
+    "sourceGeneration": "generation-1",
+    "inspectorVersion": "inspector-v1",
+    "resourceProfileVersion": "STANDARD_4CPU_8GIB_SINGLE_TASK_V1",
+    "resourceProfileSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "deadlineTime": "2026-08-17T08:02:00Z",
+    "packageKind": "DIRECTORY",
+    "requiredTools": [{"name": "INSPECTOR", "version": "1.0.0"}],
+    "sourceManifest": {
+      "manifestId": "source-manifest-1",
+      "objectCount": 1,
+      "pageCount": 1,
+      "pageSize": 1000,
+      "manifestSha256": "93d531dc8c5f5505363f4da606bb0409168b2f7eb81624a3ea5ef100826eda6d",
+      "pageGrant": {
+        "grantId": "grant-page-1",
+        "purpose": "READ_MANIFEST_PAGE",
+        "httpMethod": "GET",
+        "url": "https://control.invalid/manifest/source-manifest-1?signature=redacted",
+        "expiresAt": "2026-08-17T08:05:00Z"
+      }
+    }
+  },
+  "hashMismatchManifestPage": {
+    "messageType": "SOURCE_MANIFEST_PAGE",
+    "protocolVersion": "THREE_D_TILES_INSPECTOR_V1",
+    "inspectionId": "inspection-1",
+    "requestId": "request-1",
+    "manifestId": "source-manifest-1",
+    "pageNumber": 0,
+    "recordCount": 1,
+    "pageSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "records": [
+      {
+        "objectId": "object-1",
+        "packageRelativePath": "tileset.json",
+        "sizeBytes": 128,
+        "etag": "etag-source-1",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "readGrant": {
+          "grantId": "grant-source-1",
+          "purpose": "READ_SOURCE_OBJECT",
+          "httpMethod": "GET",
+          "url": "https://object.invalid/source?X-Amz-Signature=redacted",
+          "expiresAt": "2026-08-17T08:10:00Z"
+        }
+      }
+    ]
+  },
+  "sensitiveDiagnosticResult": {
+    "messageType": "INSPECTION_RESULT",
+    "protocolVersion": "THREE_D_TILES_INSPECTOR_V1",
+    "inspectionId": "inspection-1",
+    "requestId": "request-1",
+    "sourceGeneration": "generation-1",
+    "inspectorVersion": "inspector-v1",
+    "outcome": "FAILED",
+    "toolVersions": [{"name": "INSPECTOR", "version": "1.0.0"}],
+    "rootSelection": {"method": "NONE", "candidateCount": 0},
+    "totalResources": 0,
+    "totalDocuments": 0,
+    "totalTiles": 0,
+    "totalSubtrees": 0,
+    "totalContents": 0,
+    "resultManifest": {
+      "manifestId": "result-manifest-1",
+      "recordCount": 0,
+      "pageCount": 0,
+      "pageSize": 1000,
+      "manifestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "hierarchyManifest": {
+      "manifestId": "hierarchy-manifest-1",
+      "recordCount": 0,
+      "pageCount": 0,
+      "pageSize": 1000,
+      "manifestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "requiredExtensions": [],
+    "usedExtensions": [],
+    "diagnostics": [
+      {
+        "code": "INSPECTOR_INTERNAL_FAILURE",
+        "severity": "ERROR",
+        "stage": "RESULT_PUBLICATION",
+        "safeMessage": "request failed at https://object.invalid/source?X-Amz-Signature=secret",
+        "retryable": true,
+        "occurrenceCount": 1
+      }
+    ]
+  }
+}

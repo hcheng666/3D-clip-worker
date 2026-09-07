@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "manifestId": "three-d-tiles-official-corpus-v1",
+  "storagePolicy": "MANIFEST_ONLY",
+  "requiredCoverage": [
+    "DIRECTORY_PACKAGE",
+    "ZIP_PACKAGE",
+    "THREE_TZ_PACKAGE",
+    "EXPLICIT_HIERARCHY",
+    "IMPLICIT_HIERARCHY",
+    "EXTERNAL_TILESET",
+    "MULTIPLE_CONTENTS",
+    "GLB",
+    "GLTF",
+    "B3DM",
+    "PNTS",
+    "I3DM",
+    "CMPT",
+    "DRACO",
+    "MESHOPT",
+    "KTX2_BASISU",
+    "PNG",
+    "JPEG",
+    "WEBP",
+    "LEGACY_BATCH_TABLE",
+    "FEATURE_ID",
+    "STRUCTURAL_METADATA"
+  ],
+  "sources": [
+    {
+      "id": "cesiumjs",
+      "repository": "https://github.com/CesiumGS/cesium.git",
+      "revision": "6d5d8b1f0725b6f831b336463f4b11c98023427b",
+      "license": "Apache-2.0",
+      "licensePath": "LICENSE.md",
+      "projectUrl": "https://github.com/CesiumGS/cesium",
+      "entries": [
+        {
+          "id": "cesium-batched",
+          "path": "Specs/Data/Cesium3DTiles/Batched",
+          "license": "Apache-2.0",
+          "coverage": ["B3DM", "LEGACY_BATCH_TABLE"]
+        },
+        {
+          "id": "cesium-composite",
+          "path": "Specs/Data/Cesium3DTiles/Composite",
+          "license": "Apache-2.0",
+          "coverage": ["CMPT"]
+        },
+        {
+          "id": "cesium-gltf-content",
+          "path": "Specs/Data/Cesium3DTiles/GltfContent",
+          "license": "Apache-2.0",
+          "coverage": ["GLB", "GLTF"]
+        },
+        {
+          "id": "cesium-implicit",
+          "path": "Specs/Data/Cesium3DTiles/Implicit",
+          "license": "Apache-2.0",
+          "coverage": ["IMPLICIT_HIERARCHY"]
+        },
+        {
+          "id": "cesium-instanced",
+          "path": "Specs/Data/Cesium3DTiles/Instanced",
+          "license": "Apache-2.0",
+          "coverage": ["I3DM"]
+        },
+        {
+          "id": "cesium-metadata",
+          "path": "Specs/Data/Cesium3DTiles/Metadata",
+          "license": "Apache-2.0",
+          "coverage": ["FEATURE_ID", "STRUCTURAL_METADATA"]
+        },
+        {
+          "id": "cesium-multiple-contents",
+          "path": "Specs/Data/Cesium3DTiles/MultipleContents",
+          "license": "Apache-2.0",
+          "coverage": ["MULTIPLE_CONTENTS"]
+        },
+        {
+          "id": "cesium-point-cloud",
+          "path": "Specs/Data/Cesium3DTiles/PointCloud",
+          "license": "Apache-2.0",
+          "coverage": ["PNTS"]
+        },
+        {
+          "id": "cesium-tilesets",
+          "path": "Specs/Data/Cesium3DTiles/Tilesets",
+          "license": "Apache-2.0",
+          "coverage": ["DIRECTORY_PACKAGE", "EXPLICIT_HIERARCHY", "EXTERNAL_TILESET"]
+        }
+      ]
+    },
+    {
+      "id": "cesium-3d-tiles-validator",
+      "repository": "https://github.com/CesiumGS/3d-tiles-validator.git",
+      "revision": "7fa62c5f792069b077f174b477aab85dd7fecf22",
+      "license": "Apache-2.0",
+      "licensePath": "LICENSE.md",
+      "projectUrl": "https://github.com/CesiumGS/3d-tiles-validator",
+      "entries": [
+        {
+          "id": "validator-sparse-implicit-quadtree",
+          "path": "specs/data/Samples/SparseImplicitQuadtree",
+          "license": "Apache-2.0",
+          "coverage": ["IMPLICIT_HIERARCHY"]
+        },
+        {
+          "id": "validator-sparse-implicit-octree",
+          "path": "specs/data/Samples/SparseImplicitOctree",
+          "license": "Apache-2.0",
+          "coverage": ["IMPLICIT_HIERARCHY"]
+        },
+        {
+          "id": "validator-full-metadata",
+          "path": "specs/data/Samples/TilesetWithFullMetadata",
+          "license": "Apache-2.0",
+          "coverage": ["FEATURE_ID", "STRUCTURAL_METADATA"]
+        },
+        {
+          "id": "validator-valid-3tz",
+          "path": "specs/data/tilesets/packages/validTilesetPackage.3tz",
+          "license": "Apache-2.0",
+          "coverage": ["THREE_TZ_PACKAGE"]
+        },
+        {
+          "id": "validator-invalid-feature-id",
+          "path": "specs/data/gltfExtensions/FeatureIdAttributeAndPropertyTableFeatureIdNotInRange.gltf",
+          "license": "Apache-2.0",
+          "coverage": ["FEATURE_ID", "STRUCTURAL_METADATA"]
+        }
+      ]
+    },
+    {
+      "id": "khronos-gltf-sample-assets",
+      "repository": "https://github.com/KhronosGroup/glTF-Sample-Assets.git",
+      "revision": "0ae347c92c4db782a544325bfb8bf7fa3e95c4ec",
+      "license": "MODEL_SPECIFIC",
+      "licensePath": "README.md",
+      "projectUrl": "https://github.com/KhronosGroup/glTF-Sample-Assets",
+      "entries": [
+        {
+          "id": "khronos-avocado",
+          "path": "Models/Avocado",
+          "license": "CC0-1.0",
+          "licensePath": "Models/Avocado/LICENSE.md",
+          "attribution": "Microsoft",
+          "coverage": ["GLB", "GLTF", "DRACO"]
+        },
+        {
+          "id": "khronos-meshopt-cube-test",
+          "path": "Models/MeshoptCubeTest",
+          "license": "CC0-1.0",
+          "licensePath": "Models/MeshoptCubeTest/LICENSE.md",
+          "coverage": ["MESHOPT"]
+        },
+        {
+          "id": "khronos-stained-glass-lamp",
+          "path": "Models/StainedGlassLamp",
+          "license": "CC-BY-4.0",
+          "licensePath": "Models/StainedGlassLamp/LICENSE.md",
+          "attribution": "Wayfair LLC",
+          "coverage": ["KTX2_BASISU", "PNG", "JPEG"]
+        },
+        {
+          "id": "khronos-sunglasses",
+          "path": "Models/SunglassesKhronos",
+          "license": "CC-BY-4.0",
+          "licensePath": "Models/SunglassesKhronos/LICENSE.md",
+          "attribution": "Darmstadt Graphics Group GmbH; Khronos logos remain subject to the source trademark notice",
+          "coverage": ["DRACO", "PNG", "WEBP"]
+        }
+      ]
+    }
+  ],
+  "derivedEntries": [
+    {
+      "id": "cesium-tilesets-deterministic-zip",
+      "sourceEntryId": "cesium-tilesets",
+      "generator": "tests/fixtures/generate_fixtures.ps1",
+      "outputPath": "generated/packages/cesium-tilesets.zip",
+      "license": "Apache-2.0",
+      "coverage": ["ZIP_PACKAGE"]
+    }
+  ]
+}

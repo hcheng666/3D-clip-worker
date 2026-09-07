@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "generatorVersion": "fixture-generator-v1",
+  "caseManifestSha256": "0a763b01577eb2028c1bb91de6caf3288cd12f48ee8204ea4f379770a359ff72",
+  "files": [
+    {
+      "path": "authorization/empty-authorization.geojson",
+      "size": 357,
+      "sha256": "4debe103002911b834d1f6581dfd08ff77e0284eae2749061f0fc062037f3fbd"
+    },
+    {
+      "path": "authorization/expected-empty-completion.json",
+      "size": 62,
+      "sha256": "e0d7adfa533a22d8b4a183ed369eb1d59196cb025f500784053f1c6c91cbb14e"
+    },
+    {
+      "path": "geometry/antimeridian-adjacent.geojson",
+      "size": 707,
+      "sha256": "b57dff2f87bf748148b7ecdd9b5d05ba9ee9f0441f0c9f8eaa553edaac48c3e8"
+    },
+    {
+      "path": "geometry/boundary-crossing.geojson",
+      "size": 351,
+      "sha256": "b022f6d08da7444c757268e4572b00660d20e4fc2e258238d7407934ad92b61d"
+    },
+    {
+      "path": "geometry/polygon-hole.geojson",
+      "size": 531,
+      "sha256": "fa9c5a8355b5233a93dbfb3f328c76dcb45f5196f4275d93e3c99cace9ded170"
+    },
+    {
+      "path": "malformed/b3dm-declared-length-too-large.b3dm",
+      "size": 40,
+      "sha256": "23ed43a250135cef500ad09f1c0931f9628f576ac614301fbb96d7bcfd198d5a"
+    },
+    {
+      "path": "malformed/glb-declared-length-too-large.glb",
+      "size": 12,
+      "sha256": "c93e860891dd7cdb5bd9c5b8b0bac24f920f5b90dc53e14a287cb46ee70ffbd1"
+    },
+    {
+      "path": "metadata/geometry.bin",
+      "size": 40,
+      "sha256": "dc09cb0abd5b69e0b45f550c849dd724b19d25f037634d3eb0ac0b90b9c1f562"
+    },
+    {
+      "path": "metadata/metadata-leakage.gltf",
+      "size": 1270,
+      "sha256": "b63f16b3e44dd4e79db96563133834bab32968ba05f6aaf13ca5f915c1132030"
+    },
+    {
+      "path": "metadata/metadata.bin",
+      "size": 24,
+      "sha256": "24aa0caf930f2bc2112450e6aec889bde372f3aea93d775b4df13f5dca5bb3d5"
+    },
+    {
+      "path": "security/archive-bomb.zip",
+      "size": 1167,
+      "sha256": "60ce0fd5173ad1968cab6fb19e5eeebcb67835648cc8338aa5792163658739d7"
+    },
+    {
+      "path": "security/unknown-required-extension.gltf",
+      "size": 260,
+      "sha256": "ac4b3bb70a70ec6eafae347ea82ab46c2ae769f0f421c85fe14a7323e4a1c360"
+    },
+    {
+      "path": "security/uri-traversal/gltf-percent-encoded-parent.gltf",
+      "size": 96,
+      "sha256": "498c6b8fad62485f4ffdb9fa4d5ea3cd547842aff8230377d9ccfdf7acc417b0"
+    },
+    {
+      "path": "security/uri-traversal/tileset-parent-reference.json",
+      "size": 202,
+      "sha256": "7b56571df8a3240be33a248a826c491bd8ae13a534528537d3dc3c3f1ab2f3b0"
+    }
+  ]
+}

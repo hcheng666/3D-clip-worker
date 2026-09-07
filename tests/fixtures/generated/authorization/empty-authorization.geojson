@@ -1,0 +1,7 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {"type":"Feature","properties":{"role":"scope"},"geometry":{"type":"Polygon","coordinates":[[[-1,-1],[1,-1],[1,1],[-1,1],[-1,-1]]]}},
+    {"type":"Feature","properties":{"role":"source-triangle","expected":"REMOVED"},"geometry":{"type":"Polygon","coordinates":[[[10,10],[11,10],[10,11],[10,10]]]}}
+  ]
+}

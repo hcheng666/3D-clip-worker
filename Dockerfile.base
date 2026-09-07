@@ -1,6 +1,8 @@
 ARG BASE_IMAGE=ubuntu:24.04
-ARG DEPS_VERSION=ubuntu24.04-vcpkg2025.07.25-r2
+ARG DEPS_VERSION=ubuntu24.04-vcpkg2025.07.25-r5
 ARG VCPKG_MANIFEST_SHA256
+ARG VCPKG_DOWNLOAD_CONNECT_TIMEOUT_SECONDS=15
+ARG VCPKG_DOWNLOAD_MAX_TIME_SECONDS=3600
 
 FROM ${BASE_IMAGE} AS dependency-builder
 
@@ -13,6 +15,8 @@ ARG VCPKG_REPOSITORY=https://github.com/microsoft/vcpkg.git
 ARG VCPKG_ASSET_PREFIX=https://github.com
 ARG VCPKG_GITHUB_ASSET_PREFIX
 ARG VCPKG_SQLITE_MIRROR_PREFIX
+ARG VCPKG_DOWNLOAD_CONNECT_TIMEOUT_SECONDS
+ARG VCPKG_DOWNLOAD_MAX_TIME_SECONDS
 
 ENV DEBIAN_FRONTEND=noninteractive \
     VCPKG_DISABLE_METRICS=1 \
@@ -22,6 +26,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     CLIP_WORKER_VCPKG_INSTALLED_DIR=/opt/clip-worker-deps/vcpkg_installed \
     VCPKG_GITHUB_ASSET_PREFIX=${VCPKG_GITHUB_ASSET_PREFIX} \
     VCPKG_SQLITE_MIRROR_PREFIX=${VCPKG_SQLITE_MIRROR_PREFIX} \
+    VCPKG_DOWNLOAD_CONNECT_TIMEOUT_SECONDS=${VCPKG_DOWNLOAD_CONNECT_TIMEOUT_SECONDS} \
+    VCPKG_DOWNLOAD_MAX_TIME_SECONDS=${VCPKG_DOWNLOAD_MAX_TIME_SECONDS} \
     X_VCPKG_ASSET_SOURCES="x-script,/usr/local/bin/vcpkg-download.sh {url} {dst};x-block-origin"
 
 COPY docker/offline/configure-apt-mirror.sh /usr/local/bin/configure-apt-mirror.sh
@@ -46,7 +52,6 @@ RUN git clone --depth 1 --branch "${VCPKG_REF}" "${VCPKG_REPOSITORY}" /opt/vcpkg
         --output /opt/vcpkg/vcpkg \
     && echo "${VCPKG_TOOL_SHA}  /opt/vcpkg/vcpkg" | sha512sum --check --strict \
     && chmod +x /opt/vcpkg/vcpkg \
-    && rm -rf /opt/vcpkg/.git \
     && /opt/vcpkg/vcpkg version --disable-metrics
 
 COPY docker/vcpkg-download.sh /usr/local/bin/vcpkg-download.sh
@@ -73,7 +78,7 @@ RUN case "${TARGETARCH}" in \
     && cp -a \
         "/opt/clip-worker-deps/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/share/proj/." \
         /opt/clip-worker-runtime/share/proj/ \
-    && rm -rf /opt/vcpkg/buildtrees /opt/vcpkg/packages
+    && rm -rf /opt/vcpkg/.git /opt/vcpkg/buildtrees /opt/vcpkg/packages
 
 LABEL org.opencontainers.image.title="3D Tiles Clip Worker build base" \
       com.justai.clip-worker.dependencies.version="${DEPS_VERSION}" \

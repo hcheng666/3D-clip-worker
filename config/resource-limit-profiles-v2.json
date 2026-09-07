@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 2,
+  "defaultProfile": "STANDARD_4CPU_8GIB_SINGLE_TASK_V2",
+  "profiles": [
+    {
+      "id": "STANDARD_4CPU_8GIB_SINGLE_TASK_V2",
+      "description": "Mesh normalization and clipping limits for one task in a 4 vCPU / 8 GiB worker container.",
+      "deployment": {
+        "cpuLimit": 4,
+        "memoryBytes": 8589934592,
+        "maximumConcurrentTasks": 1,
+        "maximumTaskResidentBytes": 6442450944
+      },
+      "resourceClosure": {
+        "maximumResourceCount": 100000,
+        "maximumDecodedDataUriBytes": 67108864,
+        "maximumInputBytes": 4294967296,
+        "maximumOutputBytes": 4294967296
+      },
+      "gltf": {
+        "maximumJsonBytes": 67108864,
+        "maximumScenes": 64,
+        "maximumNodes": 1000000,
+        "maximumMeshes": 100000,
+        "maximumPrimitives": 2000000,
+        "maximumAccessors": 100000,
+        "maximumBufferViews": 100000,
+        "maximumBuffers": 4096,
+        "maximumMaterials": 100000,
+        "maximumTextures": 100000,
+        "maximumImages": 100000,
+        "maximumSparseAccessorElements": 5000000
+      },
+      "geometry": {
+        "maximumVerticesPerContent": 5000000,
+        "maximumTrianglesPerContent": 2000000,
+        "maximumDecodedGeometryBytes": 2147483648
+      },
+      "texture": {
+        "maximumWidthPixels": 8192,
+        "maximumHeightPixels": 8192,
+        "maximumPixelsPerImage": 67108864,
+        "maximumDecodedRgbaBytesPerImage": 268435456,
+        "maximumAggregateTexturePixels": 268435456,
+        "maximumUvRepeatSpan": 256,
+        "maximumMaskRasterTests": 1000000000
+      },
+      "metadata": {
+        "maximumFeatureRows": 10000000,
+        "maximumProperties": 4096,
+        "maximumStringBytes": 67108864,
+        "maximumBinaryBytes": 268435456
+      },
+      "authorization": {
+        "maximumPolygons": 100000,
+        "maximumRings": 100000,
+        "maximumPoints": 2000000,
+        "maximumDensifiedPointsPerSegment": 100000,
+        "maximumTriangles": 4000000,
+        "densifySegmentMeters": 10
+      },
+      "decoder": {
+        "maximumAggregateDecodedBytes": 4294967296,
+        "maximumSingleDecoderScratchBytes": 1073741824,
+        "maximumDracoPoints": 5000000,
+        "maximumDracoFaces": 2000000,
+        "maximumDracoAttributeComponents": 4,
+        "maximumMeshoptCount": 6000000,
+        "maximumMeshoptStride": 256
+      },
+      "deadlineSeconds": {
+        "normalization": 900,
+        "clipping": 900
+      },
+      "policy": {
+        "limitFailureMode": "FAIL_CLOSED",
+        "canonicalTextureEncoding": "PNG",
+        "normalizationVersion": "normalization-v2",
+        "canonicalContractVersion": "canonical-gltf2-v1"
+      }
+    }
+  ]
+}

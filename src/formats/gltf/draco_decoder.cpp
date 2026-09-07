@@ -19,18 +19,19 @@
 namespace clip_worker::formats {
 namespace {
 
-constexpr std::size_t kMaximumDecodedPoints = 5U * 1000U * 1000U;
-constexpr std::size_t kMaximumDecodedFaces = 10U * 1000U * 1000U;
-constexpr std::size_t kMaximumAttributeComponents = 4U;
-constexpr std::size_t kMaximumDecodedBytes = 512U * 1024U * 1024U;
 constexpr std::size_t kTriangleVertexCount = 3U;
 
 [[noreturn]] void invalidDraco(const std::string& message) {
-    throw FormatError(FormatErrorCode::invalid_accessor, message);
+    throw FormatError(FormatErrorCode::compression_draco_invalid, message);
 }
 
 [[noreturn]] void unsupportedDraco(const std::string& message) {
-    throw FormatError(FormatErrorCode::unsupported_content, message);
+    throw FormatError(FormatErrorCode::compression_draco_unsupported, message);
+}
+
+[[noreturn]] void limitDraco(const std::string& message) {
+    throw FormatError(FormatErrorCode::compression_draco_limit_exceeded,
+                      message);
 }
 
 std::size_t checkedProduct(std::size_t left, std::size_t right,
@@ -42,11 +43,12 @@ std::size_t checkedProduct(std::size_t left, std::size_t right,
 }
 
 void addDecodedBytes(std::size_t count, std::size_t element_size,
+                     std::size_t maximum_decoded_bytes,
                      std::size_t& decoded_bytes) {
     const std::size_t additional = checkedProduct(count, element_size,
                                                   "decoded attribute");
-    if (additional > kMaximumDecodedBytes - decoded_bytes) {
-        unsupportedDraco("Draco decoded data exceeds the safety limit");
+    if (additional > maximum_decoded_bytes - decoded_bytes) {
+        limitDraco("Draco decoded data exceeds the safety limit");
     }
     decoded_bytes += additional;
 }
@@ -61,7 +63,8 @@ std::string decodeFailure(const char* prefix, const draco::Status& status) {
 
 DecodedDracoMesh DracoDecoder::decode(
         ByteView compressed,
-        const std::vector<DracoAttributeRequest>& attributes) {
+        const std::vector<DracoAttributeRequest>& attributes,
+        const DracoDecodeLimits& limits) {
     if (compressed.data() == nullptr || compressed.size() == 0U) {
         invalidDraco("Draco bufferView is empty");
     }
@@ -90,15 +93,16 @@ DecodedDracoMesh DracoDecoder::decode(
     DecodedDracoMesh result;
     result.point_count = static_cast<std::size_t>(mesh->num_points());
     const std::size_t face_count = static_cast<std::size_t>(mesh->num_faces());
-    if (result.point_count == 0U || result.point_count > kMaximumDecodedPoints
-        || face_count == 0U || face_count > kMaximumDecodedFaces) {
-        unsupportedDraco("Draco point or face count exceeds the supported range");
+    if (result.point_count == 0U || result.point_count > limits.maximum_points
+        || face_count == 0U || face_count > limits.maximum_faces) {
+        limitDraco("Draco point or face count exceeds the supported range");
     }
 
     std::size_t decoded_bytes = 0U;
     const std::size_t index_count = checkedProduct(face_count, kTriangleVertexCount,
                                                    "index");
-    addDecodedBytes(index_count, sizeof(std::uint32_t), decoded_bytes);
+    addDecodedBytes(index_count, sizeof(std::uint32_t),
+                    limits.maximum_decoded_bytes, decoded_bytes);
     result.indices.reserve(index_count);
     for (std::size_t face_index = 0U; face_index < face_count; ++face_index) {
         const auto& face = mesh->face(
@@ -115,7 +119,7 @@ DecodedDracoMesh DracoDecoder::decode(
     std::set<std::uint32_t> requested_ids;
     for (const auto& request : attributes) {
         if (request.component_count == 0U
-            || request.component_count > kMaximumAttributeComponents
+            || request.component_count > limits.maximum_attribute_components
             || !requested_ids.insert(request.unique_id).second) {
             invalidDraco("Draco attribute mapping is invalid or duplicated");
         }
@@ -135,7 +139,8 @@ DecodedDracoMesh DracoDecoder::decode(
             if (request.component_count != 1U) {
                 invalidDraco("Draco unsigned attributes must be scalar");
             }
-            addDecodedBytes(value_count, sizeof(std::uint32_t), decoded_bytes);
+            addDecodedBytes(value_count, sizeof(std::uint32_t),
+                            limits.maximum_decoded_bytes, decoded_bytes);
             auto& values = result.unsigned_attributes[request.unique_id];
             values.resize(value_count);
             for (std::size_t point = 0U; point < result.point_count; ++point) {
@@ -148,7 +153,8 @@ DecodedDracoMesh DracoDecoder::decode(
             continue;
         }
 
-        addDecodedBytes(value_count, sizeof(double), decoded_bytes);
+        addDecodedBytes(value_count, sizeof(double),
+                        limits.maximum_decoded_bytes, decoded_bytes);
         auto& values = result.floating_attributes[request.unique_id];
         values.resize(value_count);
         for (std::size_t point = 0U; point < result.point_count; ++point) {

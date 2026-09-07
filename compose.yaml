@@ -2,7 +2,7 @@ name: ${COMPOSE_PROJECT_NAME:-three-d-tiles-clip-worker}
 
 services:
   clip-worker:
-    image: ${CLIP_WORKER_IMAGE:-3d-tiles-clip-worker:0.1.7}
+    image: ${CLIP_WORKER_IMAGE:-3d-tiles-clip-worker:0.1.9}
     build:
       context: .
       dockerfile: Dockerfile
@@ -15,6 +15,8 @@ services:
         VCPKG_SQLITE_MIRROR_PREFIX: ${CLIP_WORKER_VCPKG_SQLITE_MIRROR_PREFIX:-}
     restart: unless-stopped
     init: true
+    cpus: ${CLIP_WORKER_CPU_LIMIT:-4.0}
+    mem_limit: ${CLIP_WORKER_MEMORY_LIMIT:-8g}
     read_only: true
     cap_drop:
       - ALL

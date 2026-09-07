@@ -1,0 +1,9 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {"type":"Feature","properties":{"role":"scope","representation":"split-multipolygon"},"geometry":{"type":"MultiPolygon","coordinates":[[[[179.8,-1],[180,-1],[180,1],[179.8,1],[179.8,-1]]],[[[-180,-1],[-179.8,-1],[-179.8,1],[-180,1],[-180,-1]]]]}},
+    {"type":"Feature","properties":{"role":"east-point","expected":"INCLUDED"},"geometry":{"type":"Point","coordinates":[179.9,0]}},
+    {"type":"Feature","properties":{"role":"west-point","expected":"INCLUDED"},"geometry":{"type":"Point","coordinates":[-179.9,0]}},
+    {"type":"Feature","properties":{"role":"greenwich-point","expected":"EXCLUDED"},"geometry":{"type":"Point","coordinates":[0,0]}}
+  ]
+}

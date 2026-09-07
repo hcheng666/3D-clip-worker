@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "gateId": "mesh-normalization-clipping-task-6-v1",
+  "normalizationVersion": "normalization-v2",
+  "canonicalContractVersion": "canonical-gltf2-v1",
+  "resourceProfileVersion": "STANDARD_4CPU_8GIB_SINGLE_TASK_V2",
+  "resourceProfileSha256": "bb326727f6b29a6cdd3532d85e2043c3c0ff212056b837d3d4a2eca7df3d349c",
+  "requiredTestSlices": [
+    "GEOMETRY",
+    "TEXTURE",
+    "COMPRESSION",
+    "TRANSFORM",
+    "METADATA",
+    "EMPTY_RESULT",
+    "DETERMINISM",
+    "RESOURCE_LIMIT"
+  ],
+  "entries": [
+    {
+      "entryId": "cesium-batched",
+      "variants": [
+        {
+          "id": "supported-gltf2-legacy-batch-table",
+          "selectors": ["**/*.b3dm"],
+          "outcome": "SUPPORTED"
+        },
+        {
+          "id": "unsupported-complex-legacy-metadata",
+          "selectors": ["**/*.b3dm"],
+          "outcome": "UNSUPPORTED",
+          "reason": "METADATA_BATCH_TABLE_UNSUPPORTED"
+        }
+      ]
+    },
+    {
+      "entryId": "cesium-gltf-content",
+      "variants": [
+        {
+          "id": "direct-glb2",
+          "selectors": ["**/*.glb"],
+          "outcome": "SUPPORTED"
+        },
+        {
+          "id": "direct-gltf2-approved-closure",
+          "selectors": ["**/*.gltf"],
+          "outcome": "SUPPORTED"
+        }
+      ]
+    },
+    {
+      "entryId": "khronos-avocado",
+      "variants": [
+        {
+          "id": "core-and-binary",
+          "selectors": ["**/*.gltf", "**/*.glb"],
+          "outcome": "SUPPORTED"
+        },
+        {
+          "id": "draco",
+          "selectors": ["**/*Draco*/*", "**/*draco*/*"],
+          "outcome": "SUPPORTED"
+        }
+      ]
+    },
+    {
+      "entryId": "khronos-meshopt-cube-test",
+      "variants": [
+        {
+          "id": "meshopt",
+          "selectors": ["**/*.gltf", "**/*.glb"],
+          "outcome": "SUPPORTED"
+        }
+      ]
+    },
+    {
+      "entryId": "khronos-stained-glass-lamp",
+      "variants": [
+        {
+          "id": "core-png-jpeg",
+          "selectors": ["**/*.gltf", "**/*.glb"],
+          "outcome": "SUPPORTED"
+        },
+        {
+          "id": "ktx2-basisu",
+          "selectors": ["**/*.ktx2"],
+          "outcome": "SUPPORTED"
+        }
+      ]
+    },
+    {
+      "entryId": "khronos-sunglasses",
+      "variants": [
+        {
+          "id": "draco-png-webp",
+          "selectors": ["**/*.gltf", "**/*.glb"],
+          "outcome": "SUPPORTED"
+        }
+      ]
+    }
+  ]
+}

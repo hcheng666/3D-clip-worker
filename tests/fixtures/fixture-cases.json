@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "generatorVersion": "fixture-generator-v1",
+  "cases": [
+    {
+      "id": "boundary-crossing",
+      "category": "GEOMETRY",
+      "outputs": ["geometry/boundary-crossing.geojson"],
+      "expected": "CLIPPED"
+    },
+    {
+      "id": "polygon-hole",
+      "category": "GEOMETRY",
+      "outputs": ["geometry/polygon-hole.geojson"],
+      "expected": "HOLE_EXCLUDED"
+    },
+    {
+      "id": "antimeridian-adjacent",
+      "category": "GEOMETRY",
+      "outputs": ["geometry/antimeridian-adjacent.geojson"],
+      "expected": "NO_LONGITUDE_SHORTCUT"
+    },
+    {
+      "id": "malformed-byte-lengths",
+      "category": "MALFORMED_BINARY",
+      "outputs": [
+        "malformed/b3dm-declared-length-too-large.b3dm",
+        "malformed/glb-declared-length-too-large.glb"
+      ],
+      "expectedReason": "CONTENT_BINARY_LENGTH_INVALID"
+    },
+    {
+      "id": "uri-traversal",
+      "category": "PACKAGE_SECURITY",
+      "outputs": [
+        "security/uri-traversal/tileset-parent-reference.json",
+        "security/uri-traversal/gltf-percent-encoded-parent.gltf"
+      ],
+      "expectedReason": "RESOURCE_URI_TRAVERSAL"
+    },
+    {
+      "id": "archive-bomb",
+      "category": "PACKAGE_SECURITY",
+      "outputs": ["security/archive-bomb.zip"],
+      "expandedBytes": 1048576,
+      "minimumCompressionRatio": 100,
+      "expectedReason": "PACKAGE_COMPRESSION_RATIO_EXCEEDED"
+    },
+    {
+      "id": "unknown-required-extension",
+      "category": "EXTENSION_SECURITY",
+      "outputs": ["security/unknown-required-extension.gltf"],
+      "expectedReason": "CONTENT_REQUIRED_EXTENSION_UNSUPPORTED"
+    },
+    {
+      "id": "metadata-leakage",
+      "category": "METADATA_SECURITY",
+      "outputs": [
+        "metadata/metadata-leakage.gltf",
+        "metadata/geometry.bin",
+        "metadata/metadata.bin"
+      ],
+      "retainedFeatureIds": [0],
+      "forbiddenUtf8Markers": ["secret"],
+      "expectedReasonOnUnsafeRebuild": "METADATA_RECONSTRUCTION_UNSAFE"
+    },
+    {
+      "id": "empty-authorization",
+      "category": "AUTHORIZATION_RESULT",
+      "outputs": [
+        "authorization/empty-authorization.geojson",
+        "authorization/expected-empty-completion.json"
+      ],
+      "expected": "EMPTY"
+    }
+  ]
+}

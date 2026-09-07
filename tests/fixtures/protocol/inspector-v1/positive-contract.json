@@ -1,0 +1,175 @@
+{
+  "inspectionRequest": {
+    "messageType": "INSPECTION_REQUEST",
+    "protocolVersion": "THREE_D_TILES_INSPECTOR_V1",
+    "inspectionId": "inspection-1",
+    "requestId": "request-1",
+    "sourceGeneration": "generation-1",
+    "inspectorVersion": "inspector-v1",
+    "resourceProfileVersion": "STANDARD_4CPU_8GIB_SINGLE_TASK_V1",
+    "resourceProfileSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "deadlineTime": "2026-08-17T08:02:00Z",
+    "packageKind": "DIRECTORY",
+    "selectedRootHint": "tileset.json",
+    "requiredTools": [
+      {
+        "name": "INSPECTOR",
+        "version": "1.0.0",
+        "buildSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    ],
+    "sourceManifest": {
+      "manifestId": "source-manifest-1",
+      "objectCount": 1,
+      "pageCount": 1,
+      "pageSize": 1000,
+      "manifestSha256": "93d531dc8c5f5505363f4da606bb0409168b2f7eb81624a3ea5ef100826eda6d",
+      "pageGrant": {
+        "grantId": "grant-page-1",
+        "purpose": "READ_MANIFEST_PAGE",
+        "httpMethod": "GET",
+        "url": "https://control.invalid/manifest/source-manifest-1?signature=redacted",
+        "expiresAt": "2026-08-17T08:05:00Z"
+      }
+    }
+  },
+  "sourceManifestPage": {
+    "messageType": "SOURCE_MANIFEST_PAGE",
+    "protocolVersion": "THREE_D_TILES_INSPECTOR_V1",
+    "inspectionId": "inspection-1",
+    "requestId": "request-1",
+    "manifestId": "source-manifest-1",
+    "pageNumber": 0,
+    "recordCount": 1,
+    "pageSha256": "80b199d41ea91dbe1d8c9fcf377b1e9a9261e679eeb89aecab0babab1579ba91",
+    "records": [
+      {
+        "objectId": "object-1",
+        "packageRelativePath": "tileset.json",
+        "sizeBytes": 128,
+        "etag": "etag-source-1",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "readGrant": {
+          "grantId": "grant-source-1",
+          "purpose": "READ_SOURCE_OBJECT",
+          "httpMethod": "GET",
+          "url": "https://object.invalid/source?X-Amz-Signature=redacted",
+          "expiresAt": "2026-08-17T08:10:00Z"
+        }
+      }
+    ]
+  },
+  "inspectionResult": {
+    "messageType": "INSPECTION_RESULT",
+    "protocolVersion": "THREE_D_TILES_INSPECTOR_V1",
+    "inspectionId": "inspection-1",
+    "requestId": "request-1",
+    "sourceGeneration": "generation-1",
+    "inspectorVersion": "inspector-v1",
+    "outcome": "SUCCEEDED",
+    "toolVersions": [
+      {
+        "name": "INSPECTOR",
+        "version": "1.0.0",
+        "buildSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    ],
+    "sourceClosureHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "rootSelection": {
+      "method": "EXPLICIT",
+      "selectedRootPath": "tileset.json",
+      "candidateCount": 1
+    },
+    "totalResources": 1,
+    "totalDocuments": 1,
+    "totalTiles": 1,
+    "totalSubtrees": 0,
+    "totalContents": 0,
+    "resultManifest": {
+      "manifestId": "result-manifest-1",
+      "recordCount": 1,
+      "pageCount": 1,
+      "pageSize": 1000,
+      "manifestSha256": "466d169700823d81886bdeafc3f2b0dc58bbc379f6a1d4ab7fad90b46344aeca"
+    },
+    "hierarchyManifest": {
+      "manifestId": "hierarchy-manifest-1",
+      "recordCount": 2,
+      "pageCount": 1,
+      "pageSize": 1000,
+      "manifestSha256": "6baca391f7696fab68f94ccdb82b5708acc509880be3ae96e4cd9ef568ca5330"
+    },
+    "requiredExtensions": [],
+    "usedExtensions": [],
+    "diagnostics": []
+  },
+  "resultPage": {
+    "messageType": "RESULT_PAGE",
+    "protocolVersion": "THREE_D_TILES_INSPECTOR_V1",
+    "inspectionId": "inspection-1",
+    "requestId": "request-1",
+    "manifestId": "result-manifest-1",
+    "pageNumber": 0,
+    "recordCount": 1,
+    "pageSha256": "a5a4845e3956738f27999dc08070f7b920b5e632cadb3306193ab08fb2f937eb",
+    "records": [
+      {
+        "objectId": "object-1",
+        "packageRelativePath": "tileset.json",
+        "role": "TILESET",
+        "mediaType": "application/json",
+        "detectedKind": "TILESET_JSON",
+        "detectedVersion": "1.1",
+        "observedSize": 128,
+        "observedEtag": "etag-source-1",
+        "observedSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "required": true,
+        "dependencyIds": [],
+        "requiredExtensions": [],
+        "usedExtensions": []
+      }
+    ]
+  },
+  "hierarchyPage": {
+    "messageType": "HIERARCHY_RESULT_PAGE",
+    "protocolVersion": "THREE_D_TILES_INSPECTOR_V1",
+    "inspectionId": "inspection-1",
+    "requestId": "request-1",
+    "manifestId": "hierarchy-manifest-1",
+    "pageNumber": 0,
+    "recordCount": 2,
+    "pageSha256": "25e6f91768a0ee780bc08d0cb23b0ae77780828b235e76ec33d5d486589c1ace",
+    "records": [
+      {
+        "recordType": "DOCUMENT",
+        "recordId": "document-1",
+        "documentId": "document-1",
+        "resourceObjectId": "object-1",
+        "documentDepth": 0,
+        "assetVersion": "1.1",
+        "documentSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "rootTileId": "tile-1",
+        "requiredExtensions": [],
+        "usedExtensions": []
+      },
+      {
+        "recordType": "EXPLICIT_TILE",
+        "recordId": "tile-1",
+        "documentId": "document-1",
+        "tileId": "tile-1",
+        "tileJsonPointer": "",
+        "tileLevel": 0,
+        "transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+        "boundingVolumeType": "REGION",
+        "boundingVolume": [0, 0, 0, 0, 0, 0],
+        "geometricError": 0,
+        "refine": "REPLACE",
+        "contentCount": 0,
+        "hasChildren": false,
+        "implicitRoot": false,
+        "requiredExtensions": [],
+        "usedExtensions": []
+      }
+    ]
+  }
+}

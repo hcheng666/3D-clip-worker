@@ -30,6 +30,9 @@ public:
     /** Returns conservative candidates in original triangulation order. */
     void query(const ClippedTriangle& source, QueryWorkspace& workspace) const;
 
+    /** Returns conservative candidates for an exact point covers test. */
+    void query(const Point2& source, QueryWorkspace& workspace) const;
+
 private:
     struct Entry {
         Bounds bounds;

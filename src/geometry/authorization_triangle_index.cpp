@@ -45,6 +45,12 @@ AuthorizationTriangleIndex::Bounds sourceBounds(const ClippedTriangle& source) {
     return bounds;
 }
 
+AuthorizationTriangleIndex::Bounds sourceBounds(const Point2& source) {
+    const double epsilon = ClipTolerances::kPlaneEpsilonMeters;
+    return {source.x - epsilon, source.y - epsilon,
+            source.x + epsilon, source.y + epsilon};
+}
+
 AuthorizationTriangleIndex::Bounds clippingBounds(
         const ScopeTriangle& source_triangle) {
     const ScopeTriangle triangle = counterClockwise(source_triangle);
@@ -144,6 +150,18 @@ const std::vector<ScopeTriangle>& AuthorizationTriangleIndex::triangles() const 
 void AuthorizationTriangleIndex::query(
         const ClippedTriangle& source,
         QueryWorkspace& workspace) const {
+    workspace.triangle_indices.clear();
+    workspace.triangles.clear();
+    queryNode(0U, sourceBounds(source), workspace.triangle_indices);
+    std::sort(workspace.triangle_indices.begin(), workspace.triangle_indices.end());
+    workspace.triangles.reserve(workspace.triangle_indices.size());
+    for (const std::size_t index : workspace.triangle_indices) {
+        workspace.triangles.push_back(triangles_.at(index));
+    }
+}
+
+void AuthorizationTriangleIndex::query(
+        const Point2& source, QueryWorkspace& workspace) const {
     workspace.triangle_indices.clear();
     workspace.triangles.clear();
     queryNode(0U, sourceBounds(source), workspace.triangle_indices);

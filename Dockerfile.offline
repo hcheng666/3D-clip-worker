@@ -15,6 +15,7 @@ RUN test -s /opt/clip-worker-deps/vcpkg.json.sha256 \
         | sha256sum --check --strict
 
 COPY CMakeLists.txt CMakePresets.json ./
+COPY config config
 COPY include include
 COPY src src
 COPY tests tests
@@ -42,6 +43,7 @@ FROM ${RUNTIME_BASE_IMAGE} AS runtime
 
 COPY --from=build /opt/clip-worker/bin/3d-tiles-clip-worker /usr/local/bin/3d-tiles-clip-worker
 COPY --from=build /opt/clip-worker/lib/ /usr/local/lib/
+COPY --from=build /opt/clip-worker/share/clip-worker/ /usr/local/share/clip-worker/
 
 ENV LD_LIBRARY_PATH=/usr/local/lib \
     PROJ_DATA=/usr/local/share/proj

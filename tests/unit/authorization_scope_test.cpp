@@ -154,5 +154,26 @@ TEST(AuthorizationScopeTest, IndexedClipMatchesExhaustiveForMultiPolygon) {
     expectIndexedClipMatchesExhaustive(scope);
 }
 
+TEST(AuthorizationScopeTest, UsesCircularLongitudeCenterAcrossAntimeridian) {
+    const auto scope = AuthorizationScope::fromWkb(polygonWkb({{
+            {179.9, 10.0}, {-179.9, 10.0}, {-179.9, 10.1},
+            {179.9, 10.1}, {179.9, 10.0}}}), 4490);
+
+    ASSERT_FALSE(scope.triangles().empty());
+    for (const auto& triangle : scope.triangles()) {
+        for (const auto& point : triangle) {
+            EXPECT_LT(std::abs(point.x), 50000.0);
+            EXPECT_LT(std::abs(point.y), 50000.0);
+        }
+    }
+}
+
+TEST(AuthorizationScopeTest, EnforcesProfileBackedTriangulationLimits) {
+    AuthorizationScopeLimits limits;
+    limits.maximum_triangles = 1U;
+    EXPECT_THROW(AuthorizationScope::fromWkb(squareWkb(), 4490, limits),
+                 std::invalid_argument);
+}
+
 }  // namespace
 }  // namespace clip_worker::geometry

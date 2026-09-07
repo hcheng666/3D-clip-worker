@@ -1,9 +1,11 @@
 #!/bin/sh
 
-DEFAULT_DEPS_VERSION="ubuntu24.04-vcpkg2025.07.25-r2"
+DEFAULT_DEPS_VERSION="ubuntu24.04-vcpkg2025.07.25-r5"
 DEFAULT_BUILD_BASE_REPOSITORY="3d-tiles-clip-worker-build-base"
 DEFAULT_RUNTIME_BASE_REPOSITORY="3d-tiles-clip-worker-runtime-base"
 DEFAULT_MIRROR_PROFILE="official"
+DEFAULT_VCPKG_DOWNLOAD_CONNECT_TIMEOUT_SECONDS="15"
+DEFAULT_VCPKG_DOWNLOAD_MAX_TIME_SECONDS="3600"
 OFFICIAL_BASE_IMAGE="ubuntu:24.04"
 OFFICIAL_VCPKG_REPOSITORY="https://github.com/microsoft/vcpkg.git"
 OFFICIAL_VCPKG_ASSET_PREFIX="https://github.com"
@@ -50,6 +52,14 @@ validate_token() {
     token_value="$2"
     case "${token_value}" in
         ''|*[!A-Za-z0-9._-]*) die "Invalid ${token_name}: ${token_value}" ;;
+    esac
+}
+
+validate_positive_integer() {
+    integer_name="$1"
+    integer_value="$2"
+    case "${integer_value}" in
+        ''|*[!0-9]*|0) die "Invalid ${integer_name}: ${integer_value}" ;;
     esac
 }
 

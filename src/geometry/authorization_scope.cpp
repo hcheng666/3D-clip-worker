@@ -19,18 +19,41 @@ namespace {
 constexpr std::uint32_t kWkbPolygon = 3U;
 constexpr std::uint32_t kWkbMultiPolygon = 6U;
 constexpr std::int32_t kSupportedScopeSrid = 4490;
-constexpr std::size_t kMaximumPolygons = 100000U;
-constexpr std::size_t kMaximumRings = 100000U;
-constexpr std::size_t kMaximumPoints = 2000000U;
-constexpr std::size_t kMaximumDensifiedPointsPerSegment = 100000U;
 constexpr double kApproximateMetersPerDegree = 111319.49079327358;
+constexpr double kDegreesToRadians = 3.14159265358979323846 / 180.0;
+constexpr double kRadiansToDegrees = 180.0 / 3.14159265358979323846;
+
+double pointCross(const Point2& first, const Point2& second,
+                  const Point2& point) {
+    return (second.x - first.x) * (point.y - first.y)
+           - (second.y - first.y) * (point.x - first.x);
+}
+
+bool triangleCoversPoint(const ScopeTriangle& triangle, const Point2& point) {
+    const double epsilon = ClipTolerances::kPlaneEpsilonMeters;
+    const auto signed_distance = [&point](const Point2& first,
+                                          const Point2& second) {
+        const double length = std::hypot(second.x - first.x,
+                                         second.y - first.y);
+        if (!(length > 0.0)) return std::numeric_limits<double>::infinity();
+        return pointCross(first, second, point) / length;
+    };
+    const double first = signed_distance(triangle[0], triangle[1]);
+    const double second = signed_distance(triangle[1], triangle[2]);
+    const double third = signed_distance(triangle[2], triangle[0]);
+    const bool has_negative = first < -epsilon || second < -epsilon || third < -epsilon;
+    const bool has_positive = first > epsilon || second > epsilon || third > epsilon;
+    return !(has_negative && has_positive);
+}
 
 using Ring = std::vector<Point2>;
 using Polygon = std::vector<Ring>;
 
 class WkbReader final {
 public:
-    explicit WkbReader(const std::vector<std::uint8_t>& bytes) : bytes_(bytes) {
+    WkbReader(const std::vector<std::uint8_t>& bytes,
+              const AuthorizationScopeLimits& limits)
+        : bytes_(bytes), limits_(limits) {
     }
 
     std::vector<Polygon> read() {
@@ -55,7 +78,7 @@ private:
             throw std::invalid_argument("Authorization WKB must be Polygon or MultiPolygon");
         }
         const std::uint32_t count = readUint32(little_endian);
-        requireCount(count, kMaximumPolygons, "polygon");
+        requireCount(count, limits_.maximum_polygons, "polygon");
         std::vector<Polygon> polygons;
         polygons.reserve(count);
         for (std::uint32_t index = 0; index < count; ++index) {
@@ -70,7 +93,7 @@ private:
 
     Polygon readPolygon(bool little_endian) {
         const std::uint32_t ring_count = readUint32(little_endian);
-        requireCount(ring_count, kMaximumRings, "ring");
+        requireCount(ring_count, limits_.maximum_rings, "ring");
         if (ring_count == 0U) {
             throw std::invalid_argument("Authorization Polygon has no rings");
         }
@@ -78,7 +101,7 @@ private:
         polygon.reserve(ring_count);
         for (std::uint32_t ring_index = 0; ring_index < ring_count; ++ring_index) {
             const std::uint32_t point_count = readUint32(little_endian);
-            requireCount(point_count, kMaximumPoints, "point");
+            requireCount(point_count, limits_.maximum_points, "point");
             if (point_count < 4U) {
                 throw std::invalid_argument("Authorization ring has fewer than four WKB points");
             }
@@ -165,6 +188,7 @@ private:
     }
 
     const std::vector<std::uint8_t>& bytes_;
+    const AuthorizationScopeLimits& limits_;
     std::size_t offset_ = 0U;
 };
 
@@ -217,7 +241,7 @@ double longitudeDelta(double first, double second) {
     return delta;
 }
 
-Ring densify(const Ring& ring) {
+Ring densify(const Ring& ring, const AuthorizationScopeLimits& limits) {
     Ring result;
     for (std::size_t index = 0; index < ring.size(); ++index) {
         const Point2& first = ring[index];
@@ -225,14 +249,14 @@ Ring densify(const Ring& ring) {
         const double delta_lon = longitudeDelta(first.x, second.x);
         const double delta_lat = second.y - first.y;
         const double mean_latitude = (first.y + second.y) * 0.5
-                                     * 3.14159265358979323846 / 180.0;
+                                     * kDegreesToRadians;
         const double east = delta_lon * std::cos(mean_latitude)
                             * kApproximateMetersPerDegree;
         const double north = delta_lat * kApproximateMetersPerDegree;
         const double length = std::hypot(east, north);
         const auto segment_count = static_cast<std::size_t>(std::max(
-                1.0, std::ceil(length / ClipTolerances::kScopeDensifySegmentMeters)));
-        if (segment_count > kMaximumDensifiedPointsPerSegment) {
+                1.0, std::ceil(length / limits.densify_segment_meters)));
+        if (segment_count > limits.maximum_densified_points_per_segment) {
             throw std::invalid_argument("Authorization ring segment is too long to densify safely");
         }
         for (std::size_t segment = 0; segment < segment_count; ++segment) {
@@ -245,12 +269,15 @@ Ring densify(const Ring& ring) {
 }
 
 std::pair<double, double> scopeCenter(const std::vector<Polygon>& polygons) {
-    double longitude = 0.0;
+    double longitude_sine = 0.0;
+    double longitude_cosine = 0.0;
     double latitude = 0.0;
     std::size_t count = 0U;
     for (const auto& polygon : polygons) {
         for (const auto& point : polygon.front()) {
-            longitude += point.x;
+            const double radians = point.x * kDegreesToRadians;
+            longitude_sine += std::sin(radians);
+            longitude_cosine += std::cos(radians);
             latitude += point.y;
             ++count;
         }
@@ -258,8 +285,22 @@ std::pair<double, double> scopeCenter(const std::vector<Polygon>& polygons) {
     if (count == 0U) {
         throw std::invalid_argument("Authorization scope has no coordinates");
     }
-    return {longitude / static_cast<double>(count),
+    if (std::hypot(longitude_sine, longitude_cosine)
+        <= std::numeric_limits<double>::epsilon()) {
+        throw std::invalid_argument("Authorization longitude center is ambiguous");
+    }
+    return {std::atan2(longitude_sine, longitude_cosine) * kRadiansToDegrees,
             latitude / static_cast<double>(count)};
+}
+
+double unwrapLongitude(double longitude, double center) {
+    return center + longitudeDelta(center, longitude);
+}
+
+Ring unwrapRing(const Ring& ring, double center) {
+    Ring result = ring;
+    for (auto& point : result) point.x = unwrapLongitude(point.x, center);
+    return result;
 }
 
 PJ* normalizedTransform(PJ_CONTEXT* context, const char* source,
@@ -340,11 +381,20 @@ private:
 };
 
 AuthorizationScope AuthorizationScope::fromWkb(
-        const std::vector<std::uint8_t>& wkb, std::int32_t srid) {
+        const std::vector<std::uint8_t>& wkb, std::int32_t srid,
+        const AuthorizationScopeLimits& limits) {
     if (srid != kSupportedScopeSrid) {
         throw std::invalid_argument("Only EPSG:4490 authorization scopes are supported");
     }
-    auto polygons = WkbReader(wkb).read();
+    if (limits.maximum_polygons == 0U || limits.maximum_rings == 0U
+        || limits.maximum_points == 0U
+        || limits.maximum_densified_points_per_segment == 0U
+        || limits.maximum_triangles == 0U
+        || !std::isfinite(limits.densify_segment_meters)
+        || limits.densify_segment_meters <= 0.0) {
+        throw std::invalid_argument("Authorization scope limits are invalid");
+    }
+    auto polygons = WkbReader(wkb, limits).read();
     const auto center = scopeCenter(polygons);
     auto impl = std::make_unique<Impl>(center.first, center.second);
     std::vector<ScopeTriangle> triangles;
@@ -353,7 +403,8 @@ AuthorizationScope AuthorizationScope::fromWkb(
         std::vector<Point2> flattened;
         projected_polygon.reserve(polygon.size());
         for (const auto& source_ring : polygon) {
-            const auto dense_ring = densify(source_ring);
+            const auto dense_ring = densify(
+                    unwrapRing(source_ring, center.first), limits);
             std::vector<std::array<double, 2>> projected_ring;
             projected_ring.reserve(dense_ring.size());
             for (const auto& geographic : dense_ring) {
@@ -368,6 +419,10 @@ AuthorizationScope AuthorizationScope::fromWkb(
             throw std::runtime_error("Authorization triangulation returned invalid indices");
         }
         for (std::size_t index = 0; index < indices.size(); index += 3U) {
+            if (triangles.size() >= limits.maximum_triangles) {
+                throw std::invalid_argument(
+                        "Authorization triangulation exceeds the configured limit");
+            }
             triangles.push_back({flattened.at(indices[index]),
                                  flattened.at(indices[index + 1U]),
                                  flattened.at(indices[index + 2U])});
@@ -380,8 +435,14 @@ AuthorizationScope AuthorizationScope::fromWkb(
 }
 
 AuthorizationScope AuthorizationScope::fromBase64Wkb(
-        const std::string& base64_wkb, std::int32_t srid) {
-    return fromWkb(decodeBase64(base64_wkb), srid);
+        const std::string& base64_wkb, std::int32_t srid,
+        const AuthorizationScopeLimits& limits) {
+    return fromWkb(decodeBase64(base64_wkb), srid, limits);
+}
+
+std::vector<std::uint8_t> decodeAuthorizationWkbBase64(
+        const std::string& base64_wkb) {
+    return decodeBase64(base64_wkb);
 }
 
 AuthorizationScope::AuthorizationScope(std::unique_ptr<Impl> impl,
@@ -406,6 +467,22 @@ void AuthorizationScope::queryTriangles(
 ProjectedPoint AuthorizationScope::projectEcef(
         const std::array<double, 3>& ecef) const {
     return impl_->projectEcef(ecef);
+}
+
+bool AuthorizationScope::coversEcef(
+        const std::array<double, 3>& ecef,
+        AuthorizationTriangleIndex::QueryWorkspace& workspace) const {
+    return coversProjected(projectEcef(ecef).horizontal, workspace);
+}
+
+bool AuthorizationScope::coversProjected(
+        const Point2& projected,
+        AuthorizationTriangleIndex::QueryWorkspace& workspace) const {
+    triangle_index_.query(projected, workspace);
+    return std::any_of(workspace.triangles.begin(), workspace.triangles.end(),
+                       [&projected](const ScopeTriangle& triangle) {
+                           return triangleCoversPoint(triangle, projected);
+                       });
 }
 
 }  // namespace clip_worker::geometry

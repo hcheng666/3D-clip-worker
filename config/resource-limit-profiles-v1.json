@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "defaultProfile": "STANDARD_4CPU_8GIB_SINGLE_TASK_V1",
+  "profiles": [
+    {
+      "id": "STANDARD_4CPU_8GIB_SINGLE_TASK_V1",
+      "description": "Conservative first-phase limits for one inspection, normalization, or clipping task in a 4 vCPU / 8 GiB worker container.",
+      "deployment": {
+        "cpuLimit": 4,
+        "memoryBytes": 8589934592,
+        "maximumConcurrentTasks": 1,
+        "maximumTaskResidentBytes": 6442450944
+      },
+      "archive": {
+        "maximumPackageBytes": 2147483648,
+        "maximumExpandedBytes": 8589934592,
+        "maximumEntryBytes": 1073741824,
+        "maximumEntryCount": 100000,
+        "maximumPathUtf8Bytes": 1024,
+        "maximumNestingDepth": 1,
+        "maximumCompressionRatio": 100
+      },
+      "resourceClosure": {
+        "maximumUriDepth": 32,
+        "maximumResourceCount": 100000,
+        "maximumDecodedDataUriBytes": 67108864
+      },
+      "inspectorProtocol": {
+        "maximumManifestPageRecords": 1000,
+        "maximumResultPageRecords": 1000,
+        "maximumPageJsonBytes": 1048576,
+        "maximumDiagnostics": 1000,
+        "maximumDiagnosticMessageUtf8Bytes": 1024,
+        "maximumDiagnosticJsonBytes": 1048576,
+        "maximumDependenciesPerResource": 4096,
+        "maximumToolRecords": 16,
+        "minimumGrantLifetimeSeconds": 30,
+        "maximumGrantLifetimeSeconds": 900
+      },
+      "hierarchy": {
+        "maximumDocumentInstances": 1000000,
+        "maximumAvailableTiles": 5000000,
+        "maximumHierarchyRecords": 10000000,
+        "maximumContentsPerTile": 64,
+        "maximumSubtrees": 100000,
+        "maximumTileDepth": 512,
+        "maximumSubtreeBytes": 67108864,
+        "maximumHierarchySpoolBytes": 4294967296,
+        "maximumHierarchyPageRecords": 1000
+      },
+      "geometry": {
+        "maximumVerticesPerContent": 5000000,
+        "maximumTrianglesPerContent": 2000000,
+        "maximumPointsPerContent": 10000000,
+        "maximumInstancesPerContent": 250000,
+        "maximumCompositeDepth": 8,
+        "maximumCompositeChildren": 1024
+      },
+      "texture": {
+        "maximumWidthPixels": 8192,
+        "maximumHeightPixels": 8192,
+        "maximumPixelsPerImage": 67108864,
+        "maximumDecodedRgbaBytesPerImage": 268435456
+      },
+      "decoder": {
+        "maximumAggregateDecodedBytes": 4294967296,
+        "maximumSingleDecoderScratchBytes": 1073741824
+      },
+      "deadlineSeconds": {
+        "inspection": 900,
+        "normalization": 900,
+        "clipping": 900
+      },
+      "policy": {
+        "limitFailureMode": "FAIL_CLOSED",
+        "legacyB3dmRuntimeContract": "UNCHANGED",
+        "nativeCorpusVerificationRequiredBeforeCapabilityEnablement": true
+      },
+      "evidence": {
+        "benchmarkVersion": "resource-limit-scaling-v1",
+        "reportPath": "tests/benchmarks/results/resource-limit-baseline.json",
+        "nativeWorkerMeasurementsPending": true
+      }
+    }
+  ]
+}

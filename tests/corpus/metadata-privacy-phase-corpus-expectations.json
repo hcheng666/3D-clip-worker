@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "gateId": "metadata-privacy-feature-semantics-task-8-v1",
+  "protocolVersion": "THREE_D_TILES_NORMALIZER_V3",
+  "protocolSchemaSha256": "bc8a587c664b0d12df53ae5ef5568873a932951d2738b04ef242b702dac92f17",
+  "resourceProfileVersion": "STANDARD_4CPU_8GIB_SINGLE_TASK_V4",
+  "resourceProfileSha256": "b1a631c3f776210362ff795737603af88578a10634a04713dc04adff69880999",
+  "metadataMatrixVersion": "THREE_D_TILES_METADATA_CAPABILITY_V1",
+  "metadataMatrixSha256": "3be3a6b7431fd1345ce09b27bacefc4c9095fb307a6eb5fa79496cc450d65090",
+  "familyVersions": {
+    "MESH_GLTF2": {
+      "normalizationVersion": "normalization-mesh-metadata-v1",
+      "canonicalContractVersion": "canonical-mesh-metadata-gltf2-v1"
+    },
+    "POINT_GLTF2": {
+      "normalizationVersion": "normalization-point-metadata-v1",
+      "canonicalContractVersion": "canonical-point-metadata-gltf2-v1"
+    },
+    "INSTANCE_GLTF2": {
+      "normalizationVersion": "normalization-instance-metadata-v1",
+      "canonicalContractVersion": "canonical-instance-metadata-gltf2-v1"
+    },
+    "COMPOSITE_CHILDREN": {
+      "normalizationVersion": "normalization-composite-metadata-v1",
+      "canonicalContractVersion": "canonical-composite-children-metadata-v1"
+    }
+  },
+  "requiredAssertions": [
+    "PARSER",
+    "NORMALIZER",
+    "PROPERTY_LOOKUP",
+    "REMOVED_ID_REJECTION",
+    "LEAKAGE_SCAN",
+    "DETERMINISM"
+  ],
+  "entries": [
+    {
+      "entryId": "cesium-metadata",
+      "variants": [
+        {
+          "id": "legacy-b3dm-metadata-types",
+          "selectors": ["AllMetadataTypes/*.b3dm"],
+          "outcome": "SUPPORTED"
+        },
+        {
+          "id": "external-tileset-schema-metadata",
+          "selectors": ["ExternalSchema/tileset_1.1.json", "ExternalSchema/schema.json"],
+          "outcome": "UNSUPPORTED",
+          "reason": "METADATA_RELATIONSHIP_UNSUPPORTED"
+        },
+        {
+          "id": "property-attributes-point-cloud",
+          "selectors": ["PropertyAttributesPointCloud/*.gltf"],
+          "outcome": "UNSUPPORTED",
+          "reason": "METADATA_PROPERTY_ATTRIBUTE_UNSUPPORTED"
+        },
+        {
+          "id": "implicit-subtree-metadata",
+          "selectors": ["ImplicitSubtreeMetadata/subtrees/*.json"],
+          "outcome": "UNSUPPORTED",
+          "reason": "METADATA_RELATIONSHIP_UNSUPPORTED"
+        }
+      ]
+    },
+    {
+      "entryId": "validator-full-metadata",
+      "variants": [
+        {
+          "id": "tileset-statistics-and-relationships",
+          "selectors": ["tileset.json"],
+          "outcome": "UNSUPPORTED",
+          "reason": "METADATA_STATISTICS_UNSUPPORTED"
+        }
+      ]
+    },
+    {
+      "entryId": "validator-invalid-feature-id",
+      "variants": [
+        {
+          "id": "feature-id-out-of-property-table-range",
+          "selectors": ["FeatureIdAttributeAndPropertyTableFeatureIdNotInRange.gltf"],
+          "outcome": "UNSUPPORTED",
+          "reason": "METADATA_FEATURE_ID_INVALID"
+        }
+      ]
+    }
+  ],
+  "nativeEvidence": [
+    {
+      "test": "FeatureMetadataTest.PropertyLookup*",
+      "assertions": ["PROPERTY_LOOKUP", "REMOVED_ID_REJECTION"]
+    },
+    {
+      "test": "MetadataCanonicalWriterTest.*",
+      "assertions": ["NORMALIZER", "LEAKAGE_SCAN", "DETERMINISM"]
+    },
+    {
+      "test": "StructuralMetadataReaderTest.*",
+      "assertions": ["PARSER", "LEAKAGE_SCAN"]
+    },
+    {
+      "test": "LegacyFeatureMetadataTest.*",
+      "assertions": ["PARSER", "PROPERTY_LOOKUP", "LEAKAGE_SCAN"]
+    }
+  ]
+}

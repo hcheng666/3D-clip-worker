@@ -1,0 +1,429 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:justai:three-d-tiles:inspector-protocol:v1",
+  "title": "Bounded 3D Tiles Inspector Protocol V1",
+  "oneOf": [
+    {"$ref": "#/$defs/inspectionRequest"},
+    {"$ref": "#/$defs/sourceManifestPage"},
+    {"$ref": "#/$defs/inspectionResult"},
+    {"$ref": "#/$defs/resultPage"},
+    {"$ref": "#/$defs/hierarchyPage"}
+  ],
+  "$defs": {
+    "nonBlank": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": ".*\\S.*"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "utcTime": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "packagePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^?#]+$"
+    },
+    "relativeUriTemplate": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*://)[^?#]+$"
+    },
+    "extensionSet": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 256}
+    },
+    "toolVersion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "enum": ["INSPECTOR", "ARCHIVE_READER", "THREE_D_TILES_VALIDATOR", "GLTF_VALIDATOR"]
+        },
+        "version": {"$ref": "#/$defs/nonBlank"},
+        "buildSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "accessGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["grantId", "purpose", "httpMethod", "url", "expiresAt"],
+      "properties": {
+        "grantId": {"$ref": "#/$defs/nonBlank"},
+        "purpose": {"enum": ["READ_MANIFEST_PAGE", "READ_SOURCE_OBJECT"]},
+        "httpMethod": {"const": "GET"},
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192,
+          "pattern": "^https?://"
+        },
+        "expiresAt": {"$ref": "#/$defs/utcTime"}
+      }
+    },
+    "manifestDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifestId", "objectCount", "pageCount", "pageSize", "manifestSha256", "pageGrant"],
+      "properties": {
+        "manifestId": {"$ref": "#/$defs/nonBlank"},
+        "objectCount": {"type": "integer", "minimum": 1, "maximum": 100000},
+        "pageCount": {"type": "integer", "minimum": 1, "maximum": 100000},
+        "pageSize": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "manifestSha256": {"$ref": "#/$defs/sha256"},
+        "pageGrant": {"$ref": "#/$defs/accessGrant"}
+      }
+    },
+    "sourceObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["objectId", "packageRelativePath", "sizeBytes", "etag", "readGrant"],
+      "properties": {
+        "objectId": {"$ref": "#/$defs/nonBlank"},
+        "packageRelativePath": {"$ref": "#/$defs/packagePath"},
+        "sizeBytes": {"type": "integer", "minimum": 0, "maximum": 2147483648},
+        "etag": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "readGrant": {"$ref": "#/$defs/accessGrant"}
+      }
+    },
+    "inspectionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "messageType", "protocolVersion", "inspectionId", "requestId", "sourceGeneration",
+        "inspectorVersion", "resourceProfileVersion", "resourceProfileSha256", "deadlineTime",
+        "packageKind", "requiredTools", "sourceManifest"
+      ],
+      "properties": {
+        "messageType": {"const": "INSPECTION_REQUEST"},
+        "protocolVersion": {"const": "THREE_D_TILES_INSPECTOR_V1"},
+        "inspectionId": {"$ref": "#/$defs/nonBlank"},
+        "requestId": {"$ref": "#/$defs/nonBlank"},
+        "sourceGeneration": {"$ref": "#/$defs/nonBlank"},
+        "inspectorVersion": {"$ref": "#/$defs/nonBlank"},
+        "resourceProfileVersion": {"$ref": "#/$defs/nonBlank"},
+        "resourceProfileSha256": {"$ref": "#/$defs/sha256"},
+        "deadlineTime": {"$ref": "#/$defs/utcTime"},
+        "packageKind": {"enum": ["DIRECTORY", "ZIP", "THREE_TZ"]},
+        "selectedRootHint": {"$ref": "#/$defs/packagePath"},
+        "requiredTools": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {"$ref": "#/$defs/toolVersion"}
+        },
+        "sourceManifest": {"$ref": "#/$defs/manifestDescriptor"}
+      }
+    },
+    "sourceManifestPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "messageType", "protocolVersion", "inspectionId", "requestId", "manifestId",
+        "pageNumber", "recordCount", "pageSha256", "records"
+      ],
+      "properties": {
+        "messageType": {"const": "SOURCE_MANIFEST_PAGE"},
+        "protocolVersion": {"const": "THREE_D_TILES_INSPECTOR_V1"},
+        "inspectionId": {"$ref": "#/$defs/nonBlank"},
+        "requestId": {"$ref": "#/$defs/nonBlank"},
+        "manifestId": {"$ref": "#/$defs/nonBlank"},
+        "pageNumber": {"type": "integer", "minimum": 0},
+        "recordCount": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "pageSha256": {"$ref": "#/$defs/sha256"},
+        "records": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1000,
+          "items": {"$ref": "#/$defs/sourceObject"}
+        }
+      }
+    },
+    "resultDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifestId", "recordCount", "pageCount", "pageSize", "manifestSha256"],
+      "properties": {
+        "manifestId": {"$ref": "#/$defs/nonBlank"},
+        "recordCount": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "pageCount": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "pageSize": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "manifestSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "hierarchyDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifestId", "recordCount", "pageCount", "pageSize", "manifestSha256"],
+      "properties": {
+        "manifestId": {"$ref": "#/$defs/nonBlank"},
+        "recordCount": {"type": "integer", "minimum": 0, "maximum": 10000000},
+        "pageCount": {"type": "integer", "minimum": 0, "maximum": 10000000},
+        "pageSize": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "manifestSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "rootSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "candidateCount"],
+      "properties": {
+        "method": {"enum": ["EXPLICIT", "UNIQUE_TOP_LEVEL", "UNIQUE_GRAPH_ROOT", "NONE", "AMBIGUOUS"]},
+        "selectedRootPath": {"$ref": "#/$defs/packagePath"},
+        "candidateCount": {"type": "integer", "minimum": 0, "maximum": 100000}
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "stage", "safeMessage", "retryable", "occurrenceCount"],
+      "properties": {
+        "code": {
+          "enum": [
+            "REQUEST_INVALID", "PROTOCOL_VERSION_UNSUPPORTED", "RESOURCE_PROFILE_MISMATCH",
+            "DEADLINE_EXPIRED", "MANIFEST_INVALID", "MANIFEST_PAGE_INVALID",
+            "MANIFEST_HASH_MISMATCH", "GRANT_INVALID", "GRANT_EXPIRED",
+            "OBJECT_IDENTITY_MISMATCH", "PACKAGE_INVALID", "PACKAGE_LIMIT_EXCEEDED",
+            "RESOURCE_INVALID", "RESOURCE_LIMIT_EXCEEDED", "ROOT_SELECTION_REQUIRED",
+            "CONTENT_INVALID", "CLOSURE_INVALID", "RESULT_MANIFEST_INVALID",
+            "RESULT_PUBLICATION_FAILED", "INSPECTOR_INTERNAL_FAILURE"
+          ]
+        },
+        "severity": {"enum": ["INFO", "WARNING", "ERROR"]},
+        "stage": {
+          "enum": [
+            "REQUEST_VALIDATION", "MANIFEST_FETCH", "PACKAGE_ENUMERATION",
+            "RESOURCE_RESOLUTION", "STRUCTURE_CLASSIFICATION", "CLOSURE_VALIDATION",
+            "RESULT_PUBLICATION"
+          ]
+        },
+        "safeMessage": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "retryable": {"type": "boolean"},
+        "occurrenceCount": {"type": "integer", "minimum": 1},
+        "objectId": {"$ref": "#/$defs/nonBlank"},
+        "packageRelativePath": {"$ref": "#/$defs/packagePath"},
+        "jsonPointer": {"type": "string", "maxLength": 2048},
+        "byteOffset": {"type": "integer", "minimum": 0}
+      }
+    },
+    "inspectionResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "messageType", "protocolVersion", "inspectionId", "requestId", "sourceGeneration",
+        "inspectorVersion", "outcome", "toolVersions", "rootSelection", "totalResources",
+        "totalDocuments", "totalTiles", "totalSubtrees", "totalContents",
+        "resultManifest", "hierarchyManifest", "requiredExtensions",
+        "usedExtensions", "diagnostics"
+      ],
+      "properties": {
+        "messageType": {"const": "INSPECTION_RESULT"},
+        "protocolVersion": {"const": "THREE_D_TILES_INSPECTOR_V1"},
+        "inspectionId": {"$ref": "#/$defs/nonBlank"},
+        "requestId": {"$ref": "#/$defs/nonBlank"},
+        "sourceGeneration": {"$ref": "#/$defs/nonBlank"},
+        "inspectorVersion": {"$ref": "#/$defs/nonBlank"},
+        "outcome": {"enum": ["SUCCEEDED", "REJECTED", "LIMIT_EXCEEDED", "FAILED", "CANCELLED"]},
+        "toolVersions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {"$ref": "#/$defs/toolVersion"}
+        },
+        "sourceClosureHash": {"$ref": "#/$defs/sha256"},
+        "rootSelection": {"$ref": "#/$defs/rootSelection"},
+        "totalResources": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "totalDocuments": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "totalTiles": {"type": "integer", "minimum": 0, "maximum": 5000000},
+        "totalSubtrees": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "totalContents": {"type": "integer", "minimum": 0, "maximum": 10000000},
+        "resultManifest": {"$ref": "#/$defs/resultDescriptor"},
+        "hierarchyManifest": {"$ref": "#/$defs/hierarchyDescriptor"},
+        "requiredExtensions": {"$ref": "#/$defs/extensionSet"},
+        "usedExtensions": {"$ref": "#/$defs/extensionSet"},
+        "diagnostics": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {"$ref": "#/$defs/diagnostic"}
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"outcome": {"const": "SUCCEEDED"}}},
+          "then": {"required": ["sourceClosureHash"]},
+          "else": {"properties": {"sourceClosureHash": false}}
+        }
+      ]
+    },
+    "resourceEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "objectId", "packageRelativePath", "role", "detectedKind", "observedSize",
+        "observedEtag", "observedSha256", "required", "dependencyIds",
+        "requiredExtensions", "usedExtensions"
+      ],
+      "properties": {
+        "objectId": {"$ref": "#/$defs/nonBlank"},
+        "packageRelativePath": {"$ref": "#/$defs/packagePath"},
+        "role": {"enum": ["PACKAGE_ARCHIVE", "PACKAGE_OBJECT", "TILESET", "CONTENT", "SUBTREE", "BUFFER", "IMAGE", "SCHEMA", "OTHER"]},
+        "mediaType": {"type": "string", "maxLength": 256},
+        "detectedKind": {"enum": ["UNKNOWN", "TILESET_JSON", "GLTF_JSON", "SUBTREE_JSON", "GLB", "B3DM", "I3DM", "PNTS", "CMPT", "SUBTREE_BINARY", "BINARY", "IMAGE"]},
+        "detectedVersion": {"type": "string", "maxLength": 64},
+        "observedSize": {"type": "integer", "minimum": 0, "maximum": 8589934592},
+        "observedEtag": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "observedSha256": {"$ref": "#/$defs/sha256"},
+        "required": {"type": "boolean"},
+        "dependencyIds": {
+          "type": "array",
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/nonBlank"}
+        },
+        "requiredExtensions": {"$ref": "#/$defs/extensionSet"},
+        "usedExtensions": {"$ref": "#/$defs/extensionSet"}
+      }
+    },
+    "resultPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "messageType", "protocolVersion", "inspectionId", "requestId", "manifestId",
+        "pageNumber", "recordCount", "pageSha256", "records"
+      ],
+      "properties": {
+        "messageType": {"const": "RESULT_PAGE"},
+        "protocolVersion": {"const": "THREE_D_TILES_INSPECTOR_V1"},
+        "inspectionId": {"$ref": "#/$defs/nonBlank"},
+        "requestId": {"$ref": "#/$defs/nonBlank"},
+        "manifestId": {"$ref": "#/$defs/nonBlank"},
+        "pageNumber": {"type": "integer", "minimum": 0},
+        "recordCount": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "pageSha256": {"$ref": "#/$defs/sha256"},
+        "records": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1000,
+          "items": {"$ref": "#/$defs/resourceEvidence"}
+        }
+      }
+    },
+    "hierarchyRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recordType", "recordId", "requiredExtensions", "usedExtensions"],
+      "properties": {
+        "recordType": {"enum": ["DOCUMENT", "EXPLICIT_TILE", "IMPLICIT_SUBTREE", "IMPLICIT_TILE", "CONTENT"]},
+        "recordId": {"$ref": "#/$defs/nonBlank"},
+        "documentId": {"$ref": "#/$defs/nonBlank"},
+        "resourceObjectId": {"$ref": "#/$defs/nonBlank"},
+        "parentDocumentId": {"$ref": "#/$defs/nonBlank"},
+        "parentContentId": {"$ref": "#/$defs/nonBlank"},
+        "parentContentOrdinal": {"type": "integer", "minimum": 0, "maximum": 63},
+        "documentDepth": {"type": "integer", "minimum": 0, "maximum": 512},
+        "assetVersion": {"$ref": "#/$defs/nonBlank"},
+        "documentSha256": {"$ref": "#/$defs/sha256"},
+        "rootTileId": {"$ref": "#/$defs/nonBlank"},
+        "gltfUpAxis": {"enum": ["X", "Y", "Z"]},
+        "tileId": {"$ref": "#/$defs/nonBlank"},
+        "parentTileId": {"$ref": "#/$defs/nonBlank"},
+        "tileJsonPointer": {"type": "string", "maxLength": 2048, "pattern": "^$|^/"},
+        "tileLevel": {"type": "integer", "minimum": 0, "maximum": 512},
+        "implicitX": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807},
+        "implicitY": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807},
+        "implicitZ": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807},
+        "transform": {
+          "type": "array", "minItems": 16, "maxItems": 16,
+          "items": {"type": "number"}
+        },
+        "boundingVolumeType": {"enum": ["REGION", "BOX", "SPHERE"]},
+        "boundingVolume": {
+          "type": "array", "minItems": 4, "maxItems": 12,
+          "items": {"type": "number"}
+        },
+        "geometricError": {"type": "number", "minimum": 0},
+        "refine": {"enum": ["ADD", "REPLACE"]},
+        "contentCount": {"type": "integer", "minimum": 0, "maximum": 64},
+        "hasChildren": {"type": "boolean"},
+        "implicitRoot": {"type": "boolean"},
+        "subtreeId": {"$ref": "#/$defs/nonBlank"},
+        "subdivisionScheme": {"enum": ["QUADTREE", "OCTREE"]},
+        "subtreeLevels": {"type": "integer", "minimum": 1, "maximum": 512},
+        "availableLevels": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+        "availableTileCount": {"type": "integer", "minimum": 1, "maximum": 5000000},
+        "availableContentCount": {"type": "integer", "minimum": 0, "maximum": 10000000},
+        "availableChildSubtreeCount": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "contentStreamCount": {"type": "integer", "minimum": 0, "maximum": 64},
+        "contentId": {"$ref": "#/$defs/nonBlank"},
+        "contentOrdinal": {"type": "integer", "minimum": 0, "maximum": 63},
+        "contentSubdivisionScheme": {"enum": ["QUADTREE", "OCTREE"]},
+        "sourceUri": {"$ref": "#/$defs/relativeUriTemplate"},
+        "sourceResourceObjectId": {"$ref": "#/$defs/nonBlank"},
+        "contentKind": {"enum": ["MESH", "POINT", "INSTANCE", "COMPOSITE", "EXTERNAL_TILESET", "UNSUPPORTED", "UNKNOWN"]},
+        "contentFormat": {"enum": ["B3DM", "GLB", "GLTF", "PNTS", "I3DM", "CMPT", "JSON", "UNKNOWN"]},
+        "resourceClosureHash": {"$ref": "#/$defs/sha256"},
+        "resourceClosureVersion": {"const": "CONTENT_RESOURCE_CLOSURE_V1"},
+        "groupId": {"$ref": "#/$defs/nonBlank"},
+        "contentBoundingVolumeType": {"enum": ["REGION", "BOX", "SPHERE"]},
+        "contentBoundingVolume": {
+          "type": "array", "minItems": 4, "maxItems": 12,
+          "items": {"type": "number"}
+        },
+        "requiredExtensions": {"$ref": "#/$defs/extensionSet"},
+        "usedExtensions": {"$ref": "#/$defs/extensionSet"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"recordType": {"const": "DOCUMENT"}}},
+          "then": {"required": ["documentId", "resourceObjectId", "documentDepth", "assetVersion", "documentSha256", "rootTileId"]}
+        },
+        {
+          "if": {"properties": {"recordType": {"enum": ["EXPLICIT_TILE", "IMPLICIT_TILE"]}}},
+          "then": {"required": ["documentId", "tileId", "tileLevel", "transform", "boundingVolumeType", "boundingVolume", "geometricError", "refine", "contentCount", "hasChildren", "implicitRoot"]}
+        },
+        {
+          "if": {"properties": {"recordType": {"const": "IMPLICIT_SUBTREE"}}},
+          "then": {"required": ["documentId", "resourceObjectId", "tileId", "subtreeId", "subdivisionScheme", "subtreeLevels", "availableLevels", "tileLevel", "implicitX", "implicitY", "availableTileCount", "availableContentCount", "availableChildSubtreeCount", "contentStreamCount"]}
+        },
+        {
+          "if": {"properties": {"recordType": {"const": "CONTENT"}}},
+          "then": {"required": ["documentId", "tileId", "contentId", "contentOrdinal", "sourceUri", "sourceResourceObjectId", "contentKind", "contentFormat", "resourceClosureHash", "resourceClosureVersion"]}
+        }
+      ]
+    },
+    "hierarchyPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "messageType", "protocolVersion", "inspectionId", "requestId", "manifestId",
+        "pageNumber", "recordCount", "pageSha256", "records"
+      ],
+      "properties": {
+        "messageType": {"const": "HIERARCHY_RESULT_PAGE"},
+        "protocolVersion": {"const": "THREE_D_TILES_INSPECTOR_V1"},
+        "inspectionId": {"$ref": "#/$defs/nonBlank"},
+        "requestId": {"$ref": "#/$defs/nonBlank"},
+        "manifestId": {"$ref": "#/$defs/nonBlank"},
+        "pageNumber": {"type": "integer", "minimum": 0},
+        "recordCount": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "pageSha256": {"$ref": "#/$defs/sha256"},
+        "records": {
+          "type": "array", "minItems": 1, "maxItems": 1000,
+          "items": {"$ref": "#/$defs/hierarchyRecord"}
+        }
+      }
+    }
+  }
+}

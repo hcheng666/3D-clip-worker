@@ -1,10 +1,16 @@
 ARG BASE_IMAGE=ubuntu:24.04
+ARG VCPKG_DOWNLOAD_CONNECT_TIMEOUT_SECONDS=15
+ARG VCPKG_DOWNLOAD_MAX_TIME_SECONDS=3600
 
 FROM ${BASE_IMAGE} AS build
 
+ARG VCPKG_DOWNLOAD_CONNECT_TIMEOUT_SECONDS
+ARG VCPKG_DOWNLOAD_MAX_TIME_SECONDS
 ENV DEBIAN_FRONTEND=noninteractive \
     VCPKG_DISABLE_METRICS=1 \
-    VCPKG_FORCE_SYSTEM_BINARIES=1
+    VCPKG_FORCE_SYSTEM_BINARIES=1 \
+    VCPKG_DOWNLOAD_CONNECT_TIMEOUT_SECONDS=${VCPKG_DOWNLOAD_CONNECT_TIMEOUT_SECONDS} \
+    VCPKG_DOWNLOAD_MAX_TIME_SECONDS=${VCPKG_DOWNLOAD_MAX_TIME_SECONDS}
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
@@ -51,6 +57,7 @@ RUN --mount=type=cache,id=clip-worker-vcpkg-downloads,target=/opt/vcpkg/download
     && /opt/vcpkg/vcpkg install --triplet "${VCPKG_TARGET_TRIPLET}"
 
 COPY CMakeLists.txt CMakePresets.json ./
+COPY config config
 COPY include include
 COPY src src
 COPY tests tests
@@ -84,6 +91,7 @@ RUN apt-get update \
 COPY --from=build /opt/clip-worker/bin/3d-tiles-clip-worker /usr/local/bin/3d-tiles-clip-worker
 COPY --from=build /opt/clip-worker/lib/ /usr/local/lib/
 COPY --from=build /opt/clip-worker/share/proj/ /usr/local/share/proj/
+COPY --from=build /opt/clip-worker/share/clip-worker/ /usr/local/share/clip-worker/
 
 ENV LD_LIBRARY_PATH=/usr/local/lib \
     PROJ_DATA=/usr/local/share/proj

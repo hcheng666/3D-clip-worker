@@ -1,5 +1,6 @@
 #include "clip_worker/clip/b3dm_clipper.hpp"
 
+#include "clip_worker/client/object_transfer.hpp"
 #include "clip_worker/formats/b3dm.hpp"
 #include "clip_worker/formats/byte_view.hpp"
 #include "clip_worker/formats/format_error.hpp"
@@ -171,6 +172,28 @@ TEST(B3dmClipperTest, ProducesDeterministicBytesForRepeatedV8Input) {
               second.statistics.texture_bytes_after);
 }
 
+TEST(B3dmClipperTest, PreservesLegacyV8OutputByteGoldens) {
+    const auto textured = tests::makeTexturedMeshFixture();
+    const auto rtc = tests::makeTexturedMeshFixture("", true);
+    const auto y_up = tests::makeTexturedMeshFixture(
+            "", false, "", task::GltfUpAxis::y);
+    const auto draco_zero = tests::makeDracoTexturedMeshFixture(0U);
+    const auto draco_one = tests::makeDracoTexturedMeshFixture(1U);
+
+    const std::vector<std::pair<tests::TexturedMeshFixture, std::string>> cases = {
+            {textured, "ce470230db1f0023731728e542038642d78fd3934ed6088e57bc9026094ff817"},
+            {rtc, "56db9404c201fe8c9a9e9dc6d30e747e503a960a10f60bba0ee9e9ec90a6414c"},
+            {y_up, "b97fbd74511092585c3fc7ade90efed2b6a1d0273b8010d5b193fd99d7fc1686"},
+            {draco_zero, "067d72f7d66ccc4fb62cc1f3db1ca4f82712af424f49f2483797f24d2ad7a424"},
+            {draco_one, "ce470230db1f0023731728e542038642d78fd3934ed6088e57bc9026094ff817"},
+    };
+    for (const auto& fixture : cases) {
+        const auto output = B3dmClipper::clip(
+                fixture.first.b3dm, fixture.first.task);
+        EXPECT_EQ(client::sha256Hex(output.bytes), fixture.second);
+    }
+}
+
 TEST(B3dmClipperTest, ClipsDracoAndWritesUncompressedZeroAndSingleBatchOutput) {
     for (const std::uint32_t batch_length : {0U, 1U}) {
         const auto fixture = tests::makeDracoTexturedMeshFixture(batch_length);
@@ -244,7 +267,8 @@ TEST(B3dmClipperTest, RejectsMalformedDracoPayloadWithAccessorDiagnostic) {
         static_cast<void>(B3dmClipper::clip(fixture.b3dm, fixture.task));
         FAIL() << "Expected FormatError";
     } catch (const formats::FormatError& error) {
-        EXPECT_EQ(error.code(), formats::FormatErrorCode::invalid_accessor);
+        EXPECT_EQ(error.code(),
+                  formats::FormatErrorCode::compression_draco_invalid);
         EXPECT_NE(std::string(error.what()).find("Draco"), std::string::npos);
     }
 }
